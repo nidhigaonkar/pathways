@@ -77,32 +77,30 @@ export default function InfiniteCanvasPage() {
     [zoom],
   )
 
-  const handleCanvasClick = useCallback(
+  const handleCanvasDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        const rect = canvasRef.current?.getBoundingClientRect()
-        if (!rect) return
+      const rect = canvasRef.current?.getBoundingClientRect()
+      if (!rect) return
 
-        const x = (e.clientX - rect.left - pan.x) / zoom
-        const y = (e.clientY - rect.top - pan.y) / zoom
+      const x = (e.clientX - rect.left - pan.x) / zoom
+      const y = (e.clientY - rect.top - pan.y) / zoom
 
-        const newNode: ChatNodeType = {
-          id: Date.now().toString(),
-          position: { x, y },
-          userMessage: "",
-          aiResponse: "",
-          parentId: null,
-          parentIds: null, // Updated to handle multiple parents
-          connectionDirection: null,
-          expanded: true,
-          isActive: true,
-          isLoading: false,
-          model: "gpt4",
-          usageType: "focus",
-          size: { width: 400, height: 500 }, // Added size property
-        }
-        setNodes([...nodes, newNode])
+      const newNode: ChatNodeType = {
+        id: Date.now().toString(),
+        position: { x, y },
+        userMessage: "",
+        aiResponse: "",
+        parentId: null,
+        parentIds: null,
+        connectionDirection: null,
+        expanded: true,
+        isActive: true,
+        isLoading: false,
+        model: "gpt4",
+        usageType: "focus",
+        size: { width: 400, height: 500 },
       }
+      setNodes([...nodes, newNode])
     },
     [nodes, pan, zoom],
   )
@@ -403,7 +401,7 @@ export default function InfiniteCanvasPage() {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
-        onClick={handleCanvasClick}
+        onDoubleClick={handleCanvasDoubleClick}
       >
         {/* Canvas grid background */}
         <div
@@ -469,7 +467,7 @@ export default function InfiniteCanvasPage() {
             <span>
               {isMergeMode
                 ? "Click another node to merge"
-                : "Ctrl+Click to create • Drag to pan • Scroll to zoom • Click title to rename"}
+                : "Double-click to create • Drag to pan • Scroll to zoom • Click title to rename"}
             </span>
           </div>
         </div>
