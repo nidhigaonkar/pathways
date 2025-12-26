@@ -23,6 +23,8 @@ export default function InfiniteCanvasPage() {
       expanded: true,
       isActive: false,
       isLoading: false,
+      model: "gpt4",
+      usageType: "focus",
     },
   ])
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
@@ -68,7 +70,6 @@ export default function InfiniteCanvasPage() {
     [zoom],
   )
 
-  // Create new node on Ctrl+Click
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -87,11 +88,44 @@ export default function InfiniteCanvasPage() {
           expanded: true,
           isActive: true,
           isLoading: false,
+          model: "gpt4",
+          usageType: "focus",
         }
         setNodes([...nodes, newNode])
       }
     },
     [nodes, pan, zoom],
+  )
+
+  const handleCreateDirectional = useCallback(
+    (parentId: string, direction: "top" | "right" | "bottom" | "left") => {
+      const parent = nodes.find((n) => n.id === parentId)
+      if (!parent) return
+
+      const offsets = {
+        top: { x: 0, y: -300 },
+        right: { x: 500, y: 0 },
+        bottom: { x: 0, y: 300 },
+        left: { x: -500, y: 0 },
+      }
+
+      const offset = offsets[direction]
+      const newNode: ChatNodeType = {
+        id: Date.now().toString(),
+        position: { x: parent.position.x + offset.x, y: parent.position.y + offset.y },
+        userMessage: "",
+        aiResponse: "",
+        parentId,
+        expanded: true,
+        isActive: true,
+        isLoading: false,
+        model: parent.model || "gpt4",
+        usageType: parent.usageType || "focus",
+      }
+      console.log("[v0] Creating node with parent", parentId, "in direction", direction)
+      setNodes([...nodes, newNode])
+    },
+    [nodes],
   )
 
   // Fork node (create child)
@@ -109,6 +143,8 @@ export default function InfiniteCanvasPage() {
         expanded: true,
         isActive: true,
         isLoading: false,
+        model: parent.model || "gpt4",
+        usageType: parent.usageType || "focus",
       }
       setNodes([...nodes, newNode])
     },
@@ -137,30 +173,44 @@ export default function InfiniteCanvasPage() {
     setSelectedNodes((prev) => (prev.includes(nodeId) ? prev.filter((id) => id !== nodeId) : [...prev, nodeId]))
   }, [])
 
-  // Render connection lines
   const renderConnections = () => {
+    const NODE_WIDTH = 400
+    const NODE_HEIGHT = 200
+
     return nodes
       .filter((node) => node.parentId)
       .map((node) => {
         const parent = nodes.find((n) => n.id === node.parentId)
         if (!parent) return null
 
-        const startX = parent.position.x + 200
-        const startY = parent.position.y + 100
-        const endX = node.position.x + 200
-        const endY = node.position.y
+        const startX = parent.position.x + NODE_WIDTH / 2
+        const startY = parent.position.y + NODE_HEIGHT / 2
+        const endX = node.position.x + NODE_WIDTH / 2
+        const endY = node.position.y + NODE_HEIGHT / 2
 
-        const midY = (startY + endY) / 2
+        const dx = endX - startX
+        const dy = endY - startY
+        const distance = Math.sqrt(dx * dx + dy * dy)
+        const curvature = Math.min(distance * 0.3, 100)
+
+        const controlX1 = startX + dx * 0.5
+        const controlY1 = startY - curvature
+        const controlX2 = startX + dx * 0.5
+        const controlY2 = endY + curvature
+
+        console.log("[v0] Drawing connection from", parent.id, "to", node.id, { startX, startY, endX, endY })
 
         return (
-          <path
-            key={node.id}
-            d={`M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`}
-            stroke="#20b8cd"
-            strokeWidth="2"
-            fill="none"
-            opacity="0.6"
-          />
+          <g key={node.id}>
+            <path
+              d={`M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`}
+              stroke="#20b8cd"
+              strokeWidth="2"
+              fill="none"
+              opacity="0.6"
+            />
+            <circle cx={endX} cy={endY} r="4" fill="#20b8cd" />
+          </g>
         )
       })
   }
@@ -191,13 +241,20 @@ export default function InfiniteCanvasPage() {
 
         {/* SVG for connection lines */}
         <svg
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 pointer-events-none w-full h-full"
           style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: "0 0",
+            width: "100%",
+            height: "100%",
           }}
         >
-          {renderConnections()}
+          <g
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "0 0",
+            }}
+          >
+            {renderConnections()}
+          </g>
         </svg>
 
         {/* Chat nodes */}
@@ -218,6 +275,7 @@ export default function InfiniteCanvasPage() {
                 onDelete={handleDeleteNode}
                 onUpdate={handleUpdateNode}
                 onToggleSelect={handleToggleSelect}
+                onCreateDirectional={handleCreateDirectional}
               />
             ))}
           </AnimatePresence>
@@ -237,7 +295,6 @@ export default function InfiniteCanvasPage() {
             <Button
               className="bg-[#20b8cd] hover:bg-[#1a9db0] text-black font-medium shadow-lg"
               onClick={() => {
-                // Handle merge logic here
                 console.log("Merging nodes:", selectedNodes)
               }}
             >

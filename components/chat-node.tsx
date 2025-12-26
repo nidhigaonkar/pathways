@@ -6,7 +6,8 @@ import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { X, GitFork, Paperclip, Mic, Send, Check } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { X, Mic, Send, Check, Plus } from "lucide-react"
 import type { ChatNodeType } from "@/lib/types"
 
 interface ChatNodeProps {
@@ -16,16 +17,27 @@ interface ChatNodeProps {
   onDelete: (nodeId: string) => void
   onUpdate: (nodeId: string, updates: Partial<ChatNodeType>) => void
   onToggleSelect: (nodeId: string) => void
+  onCreateDirectional: (nodeId: string, direction: "top" | "right" | "bottom" | "left") => void
 }
 
-export function ChatNode({ node, isSelected, onFork, onDelete, onUpdate, onToggleSelect }: ChatNodeProps) {
+export function ChatNode({
+  node,
+  isSelected,
+  onFork,
+  onDelete,
+  onUpdate,
+  onToggleSelect,
+  onCreateDirectional,
+}: ChatNodeProps) {
   const [input, setInput] = useState("")
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [isHovered, setIsHovered] = useState(false)
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const nodeRef = useRef<HTMLDivElement>(null)
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button, textarea, input")) return
+    if ((e.target as HTMLElement).closest("button, textarea, input, select")) return
     setIsDragging(true)
     const rect = nodeRef.current?.getBoundingClientRect()
     if (rect) {
@@ -56,12 +68,25 @@ export function ChatNode({ node, isSelected, onFork, onDelete, onUpdate, onToggl
     }, 1500)
   }
 
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+    }
+    setIsHovered(true)
+  }
+
+  const handleMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false)
+    }, 100)
+  }
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return
       onUpdate(node.id, {
         position: {
-          x: (e.clientX - dragOffset.x) / 1, // Adjust for zoom if needed
+          x: (e.clientX - dragOffset.x) / 1,
           y: (e.clientY - dragOffset.y) / 1,
         },
       })
@@ -95,7 +120,58 @@ export function ChatNode({ node, isSelected, onFork, onDelete, onUpdate, onToggl
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       onMouseDown={handleMouseDown}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
+      {isHovered && (
+        <>
+          <button
+            className="absolute -top-6 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#20b8cd] hover:bg-[#1a9db0] rounded-full flex items-center justify-center text-black shadow-lg z-50"
+            onClick={(e) => {
+              e.stopPropagation()
+              onCreateDirectional(node.id, "top")
+            }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            className="absolute top-1/2 -translate-y-1/2 -right-6 w-8 h-8 bg-[#20b8cd] hover:bg-[#1a9db0] rounded-full flex items-center justify-center text-black shadow-lg z-50"
+            onClick={(e) => {
+              e.stopPropagation()
+              onCreateDirectional(node.id, "right")
+            }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#20b8cd] hover:bg-[#1a9db0] rounded-full flex items-center justify-center text-black shadow-lg z-50"
+            onClick={(e) => {
+              e.stopPropagation()
+              onCreateDirectional(node.id, "bottom")
+            }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            className="absolute top-1/2 -translate-y-1/2 -left-6 w-8 h-8 bg-[#20b8cd] hover:bg-[#1a9db0] rounded-full flex items-center justify-center text-black shadow-lg z-50"
+            onClick={(e) => {
+              e.stopPropagation()
+              onCreateDirectional(node.id, "left")
+            }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </>
+      )}
+
       <div
         className={`bg-[#1a1b1b] rounded-xl shadow-2xl overflow-hidden transition-all cursor-move ${
           node.isActive ? "ring-2 ring-[#20b8cd] shadow-[0_0_20px_rgba(32,184,205,0.3)]" : ""
@@ -119,17 +195,6 @@ export function ChatNode({ node, isSelected, onFork, onDelete, onUpdate, onToggl
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-white/60 hover:text-[#20b8cd] hover:bg-white/5"
-              onClick={(e) => {
-                e.stopPropagation()
-                onFork(node.id)
-              }}
-            >
-              <GitFork className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
               className="h-7 w-7 text-white/60 hover:text-red-400 hover:bg-white/5"
               onClick={(e) => {
                 e.stopPropagation()
@@ -139,6 +204,33 @@ export function ChatNode({ node, isSelected, onFork, onDelete, onUpdate, onToggl
               <X className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+
+        <div className="px-3 py-2 border-b border-white/10 flex gap-2">
+          <Select value={node.usageType || "focus"} onValueChange={(value) => onUpdate(node.id, { usageType: value })}>
+            <SelectTrigger className="h-8 text-xs bg-white/5 border-white/20 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="focus">Focus</SelectItem>
+              <SelectItem value="research">Research</SelectItem>
+              <SelectItem value="learn">Learn</SelectItem>
+              <SelectItem value="finance">Finance</SelectItem>
+              <SelectItem value="code">Code</SelectItem>
+              <SelectItem value="video">Video</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={node.model || "gpt4"} onValueChange={(value) => onUpdate(node.id, { model: value })}>
+            <SelectTrigger className="h-8 text-xs bg-white/5 border-white/20 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gpt4">GPT-4</SelectItem>
+              <SelectItem value="claude">Claude</SelectItem>
+              <SelectItem value="gemini">Gemini</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Messages */}
@@ -182,14 +274,6 @@ export function ChatNode({ node, isSelected, onFork, onDelete, onUpdate, onToggl
               onClick={(e) => e.stopPropagation()}
             />
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
               <Button
                 variant="ghost"
                 size="icon"

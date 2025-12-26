@@ -1,7 +1,6 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, User } from "lucide-react"
 
 export function CanvasNavbar() {
@@ -17,31 +16,8 @@ export function CanvasNavbar() {
         </div>
 
         {/* Mode selector */}
-        <Select defaultValue="focus">
-          <SelectTrigger className="w-[140px] bg-transparent border-white/20 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="focus">Focus</SelectItem>
-            <SelectItem value="research">Research</SelectItem>
-            <SelectItem value="learn">Learn</SelectItem>
-            <SelectItem value="finance">Finance</SelectItem>
-            <SelectItem value="code">Code</SelectItem>
-            <SelectItem value="video">Video</SelectItem>
-          </SelectContent>
-        </Select>
 
         {/* Model selector */}
-        <Select defaultValue="gpt4">
-          <SelectTrigger className="w-[140px] bg-transparent border-white/20 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="gpt4">GPT-4</SelectItem>
-            <SelectItem value="claude">Claude</SelectItem>
-            <SelectItem value="gemini">Gemini</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Right side */}

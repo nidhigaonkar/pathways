@@ -7,4 +7,6 @@ export interface ChatNodeType {
   expanded: boolean
   isActive: boolean
   isLoading: boolean
+  model?: string
+  usageType?: string
 }
