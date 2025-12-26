@@ -244,16 +244,32 @@ export default function InfiniteCanvasPage() {
         const controlX2 = startX + dx * 0.5
         const controlY2 = endY + curvature
 
+        // Calculate angle for arrowhead
+        const angle = Math.atan2(dy, dx)
+
         connections.push(
           <g key={`${node.id}-${parentIds[0]}`}>
+            <defs>
+              <marker
+                id={`arrowhead-${node.id}`}
+                markerWidth="10"
+                markerHeight="10"
+                refX="9"
+                refY="3"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <path d="M0,0 L0,6 L9,3 z" fill="#20b8cd" />
+              </marker>
+            </defs>
             <path
               d={`M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`}
               stroke="#20b8cd"
               strokeWidth="2"
               fill="none"
               opacity="0.6"
+              markerEnd={`url(#arrowhead-${node.id})`}
             />
-            <circle cx={endX} cy={endY} r="4" fill="#20b8cd" />
           </g>,
         )
       } else {
@@ -290,22 +306,33 @@ export default function InfiniteCanvasPage() {
                 fill="none"
                 opacity="0.6"
               />
-              <circle cx={startX} cy={startY} r="3" fill="#20b8cd" opacity="0.8" />
             </g>,
           )
         })
 
-        // Single merged arrow from merge point to target
         connections.push(
           <g key={`${node.id}-merged`}>
+            <defs>
+              <marker
+                id={`arrowhead-merged-${node.id}`}
+                markerWidth="12"
+                markerHeight="12"
+                refX="11"
+                refY="3"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <path d="M0,0 L0,6 L9,3 z" fill="#20b8cd" />
+              </marker>
+            </defs>
             <path
               d={`M ${endX} ${mergePointY} L ${endX} ${endY}`}
               stroke="#20b8cd"
               strokeWidth="3"
               fill="none"
               opacity="0.8"
+              markerEnd={`url(#arrowhead-merged-${node.id})`}
             />
-            <circle cx={endX} cy={endY} r="5" fill="#20b8cd" />
           </g>,
         )
       }
@@ -325,11 +352,16 @@ export default function InfiniteCanvasPage() {
         const targetNode = nodes.find((n) => n.id === nodeId)
 
         if (sourceNode && targetNode) {
+          const centerX = (sourceNode.position.x + targetNode.position.x) / 2
+          const maxY = Math.max(
+            sourceNode.position.y + (sourceNode.size?.height || 500),
+            targetNode.position.y + (targetNode.size?.height || 500),
+          )
           const mergedNode: ChatNodeType = {
             id: Date.now().toString(),
             position: {
-              x: (sourceNode.position.x + targetNode.position.x) / 2,
-              y: (sourceNode.position.y + targetNode.position.y) / 2 - 100,
+              x: centerX,
+              y: maxY + 150, // Position below with spacing
             },
             userMessage: `${sourceNode.userMessage}\n\n${targetNode.userMessage}`,
             aiResponse: `Merged content:\n\n${sourceNode.aiResponse}\n\n${targetNode.aiResponse}`,
