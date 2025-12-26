@@ -1,6 +1,7 @@
 export interface ChatNodeType {
   id: string
   position: { x: number; y: number }
+  size?: { width: number; height: number }
   userMessage: string
   aiResponse: string
   parentId: string | null

@@ -36,12 +36,18 @@ export function ChatNode({
   const [input, setInput] = useState("")
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ mouseX: 0, mouseY: 0, nodeX: 0, nodeY: 0 })
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizeStart, setResizeStart] = useState({ mouseX: 0, mouseY: 0, width: 0, height: 0, x: 0, y: 0 })
+  const [resizeDirection, setResizeDirection] = useState<"nw" | "ne" | "sw" | "se" | null>(null)
   const [isHovered, setIsHovered] = useState(false)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const nodeRef = useRef<HTMLDivElement>(null)
 
+  const nodeWidth = node.size?.width || 400
+  const nodeHeight = node.size?.height || 500
+
   const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button, textarea, input, select")) return
+    if ((e.target as HTMLElement).closest("button, textarea, input, select, .resize-handle")) return
     setIsDragging(true)
     setDragStart({
       mouseX: e.clientX,
@@ -50,6 +56,20 @@ export function ChatNode({
       nodeY: node.position.y,
     })
     e.stopPropagation()
+  }
+
+  const handleResizeMouseDown = (e: React.MouseEvent, direction: "nw" | "ne" | "sw" | "se") => {
+    e.stopPropagation()
+    setIsResizing(true)
+    setResizeDirection(direction)
+    setResizeStart({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      width: nodeWidth,
+      height: nodeHeight,
+      x: node.position.x,
+      y: node.position.y,
+    })
   }
 
   const handleSubmit = () => {
@@ -86,6 +106,37 @@ export function ChatNode({
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      if (isResizing && resizeDirection) {
+        const deltaX = (e.clientX - resizeStart.mouseX) / zoom
+        const deltaY = (e.clientY - resizeStart.mouseY) / zoom
+
+        let newWidth = resizeStart.width
+        let newHeight = resizeStart.height
+        let newX = resizeStart.x
+        let newY = resizeStart.y
+
+        if (resizeDirection.includes("e")) {
+          newWidth = Math.max(300, resizeStart.width + deltaX)
+        }
+        if (resizeDirection.includes("w")) {
+          newWidth = Math.max(300, resizeStart.width - deltaX)
+          newX = resizeStart.x + (resizeStart.width - newWidth)
+        }
+        if (resizeDirection.includes("s")) {
+          newHeight = Math.max(400, resizeStart.height + deltaY)
+        }
+        if (resizeDirection.includes("n")) {
+          newHeight = Math.max(400, resizeStart.height - deltaY)
+          newY = resizeStart.y + (resizeStart.height - newHeight)
+        }
+
+        onUpdate(node.id, {
+          size: { width: newWidth, height: newHeight },
+          position: { x: newX, y: newY },
+        })
+        return
+      }
+
       if (!isDragging) return
       const deltaX = (e.clientX - dragStart.mouseX) / zoom
       const deltaY = (e.clientY - dragStart.mouseY) / zoom
@@ -100,9 +151,11 @@ export function ChatNode({
 
     const handleMouseUp = () => {
       setIsDragging(false)
+      setIsResizing(false)
+      setResizeDirection(null)
     }
 
-    if (isDragging) {
+    if (isDragging || isResizing) {
       window.addEventListener("mousemove", handleMouseMove)
       window.addEventListener("mouseup", handleMouseUp)
     }
@@ -111,16 +164,17 @@ export function ChatNode({
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("mouseup", handleMouseUp)
     }
-  }, [isDragging, dragStart, node.id, onUpdate, zoom])
+  }, [isDragging, isResizing, resizeDirection, resizeStart, dragStart, node.id, onUpdate, zoom])
 
   return (
     <motion.div
       ref={nodeRef}
       className="chat-node absolute"
       style={{
-        left: node.position.x - pan.x,
-        top: node.position.y - pan.y,
-        width: 400 / zoom,
+        left: `${node.position.x}px`,
+        top: `${node.position.y}px`,
+        width: `${nodeWidth}px`,
+        height: `${nodeHeight}px`,
       }}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -175,15 +229,30 @@ export function ChatNode({
           >
             <Plus className="h-4 w-4" />
           </button>
+          <div
+            className="resize-handle absolute -top-1 -left-1 w-3 h-3 bg-white/20 hover:bg-[#20b8cd] rounded-full cursor-nw-resize"
+            onMouseDown={(e) => handleResizeMouseDown(e, "nw")}
+          />
+          <div
+            className="resize-handle absolute -top-1 -right-1 w-3 h-3 bg-white/20 hover:bg-[#20b8cd] rounded-full cursor-ne-resize"
+            onMouseDown={(e) => handleResizeMouseDown(e, "ne")}
+          />
+          <div
+            className="resize-handle absolute -bottom-1 -left-1 w-3 h-3 bg-white/20 hover:bg-[#20b8cd] rounded-full cursor-sw-resize"
+            onMouseDown={(e) => handleResizeMouseDown(e, "sw")}
+          />
+          <div
+            className="resize-handle absolute -bottom-1 -right-1 w-3 h-3 bg-white/20 hover:bg-[#20b8cd] rounded-full cursor-se-resize"
+            onMouseDown={(e) => handleResizeMouseDown(e, "se")}
+          />
         </>
       )}
 
       <div
-        className={`bg-[#1a1b1b] rounded-xl shadow-2xl overflow-hidden transition-all cursor-move ${
+        className={`bg-[#1a1b1b] rounded-xl shadow-2xl overflow-hidden transition-all cursor-move h-full flex flex-col ${
           node.isActive ? "ring-2 ring-[#20b8cd] shadow-[0_0_20px_rgba(32,184,205,0.3)]" : ""
         } ${isSelected ? "ring-2 ring-[#20b8cd]/60" : ""}`}
       >
-        {/* Node header */}
         <div className="flex items-center justify-between p-3 border-b border-white/10">
           <div className="flex items-center gap-2">
             <button
@@ -239,11 +308,12 @@ export function ChatNode({
           </Select>
         </div>
 
-        {/* Messages */}
-        <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto">
+        <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           {node.userMessage && (
             <div className="flex justify-end">
-              <div className="bg-[#20b8cd] text-black px-4 py-2 rounded-xl max-w-[80%] text-sm">{node.userMessage}</div>
+              <div className="bg-[#20b8cd] text-black px-4 py-2 rounded-xl max-w-[80%] text-sm break-words">
+                {node.userMessage}
+              </div>
             </div>
           )}
 
@@ -259,11 +329,12 @@ export function ChatNode({
           )}
 
           {node.aiResponse && !node.isLoading && (
-            <div className="bg-white/5 text-white px-4 py-3 rounded-xl text-sm leading-relaxed">{node.aiResponse}</div>
+            <div className="bg-white/5 text-white px-4 py-3 rounded-xl text-sm leading-relaxed break-words">
+              {node.aiResponse}
+            </div>
           )}
         </div>
 
-        {/* Input area */}
         <div className="p-3 border-t border-white/10">
           <div className="bg-white/5 rounded-lg p-2 flex items-end gap-2">
             <Textarea

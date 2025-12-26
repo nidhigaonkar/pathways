@@ -26,6 +26,7 @@ export default function InfiniteCanvasPage() {
       isLoading: false,
       model: "gpt4",
       usageType: "focus",
+      size: { width: 400, height: 500 }, // Added size property
     },
   ])
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
@@ -92,6 +93,7 @@ export default function InfiniteCanvasPage() {
           isLoading: false,
           model: "gpt4",
           usageType: "focus",
+          size: { width: 400, height: 500 }, // Added size property
         }
         setNodes([...nodes, newNode])
       }
@@ -124,6 +126,7 @@ export default function InfiniteCanvasPage() {
         isLoading: false,
         model: parent.model || "gpt4",
         usageType: parent.usageType || "focus",
+        size: { width: 400, height: 500 }, // Added size property
       }
       console.log("[v0] Creating node with parent", parentId, "in direction", direction)
       setNodes([...nodes, newNode])
@@ -149,6 +152,7 @@ export default function InfiniteCanvasPage() {
         isLoading: false,
         model: parent.model || "gpt4",
         usageType: parent.usageType || "focus",
+        size: { width: 400, height: 500 }, // Added size property
       }
       setNodes([...nodes, newNode])
     },
@@ -178,35 +182,37 @@ export default function InfiniteCanvasPage() {
   }, [])
 
   const renderConnections = () => {
-    const NODE_WIDTH = 400
-    const NODE_HEIGHT = 200
-
     return nodes
       .filter((node) => node.parentId)
       .map((node) => {
         const parent = nodes.find((n) => n.id === node.parentId)
         if (!parent) return null
 
+        const parentWidth = parent.size?.width || 400
+        const parentHeight = parent.size?.height || 500
+        const nodeWidth = node.size?.width || 400
+        const nodeHeight = node.size?.height || 500
+
         // Calculate start point based on connection direction
-        let startX = parent.position.x + NODE_WIDTH / 2
-        let startY = parent.position.y + NODE_HEIGHT / 2
+        let startX = parent.position.x + parentWidth / 2
+        let startY = parent.position.y + parentHeight / 2
 
         if (node.connectionDirection === "top") {
-          startX = parent.position.x + NODE_WIDTH / 2
+          startX = parent.position.x + parentWidth / 2
           startY = parent.position.y
         } else if (node.connectionDirection === "right") {
-          startX = parent.position.x + NODE_WIDTH
-          startY = parent.position.y + NODE_HEIGHT / 2
+          startX = parent.position.x + parentWidth
+          startY = parent.position.y + parentHeight / 2
         } else if (node.connectionDirection === "bottom") {
-          startX = parent.position.x + NODE_WIDTH / 2
-          startY = parent.position.y + NODE_HEIGHT
+          startX = parent.position.x + parentWidth / 2
+          startY = parent.position.y + parentHeight
         } else if (node.connectionDirection === "left") {
           startX = parent.position.x
-          startY = parent.position.y + NODE_HEIGHT / 2
+          startY = parent.position.y + parentHeight / 2
         }
 
-        const endX = node.position.x + NODE_WIDTH / 2
-        const endY = node.position.y + NODE_HEIGHT / 2
+        const endX = node.position.x + nodeWidth / 2
+        const endY = node.position.y + nodeHeight / 2
 
         const dx = endX - startX
         const dy = endY - startY
@@ -217,8 +223,6 @@ export default function InfiniteCanvasPage() {
         const controlY1 = startY - curvature
         const controlX2 = startX + dx * 0.5
         const controlY2 = endY + curvature
-
-        console.log("[v0] Drawing connection from", parent.id, "to", node.id, { startX, startY, endX, endY })
 
         return (
           <g key={node.id}>
