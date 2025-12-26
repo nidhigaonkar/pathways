@@ -291,12 +291,9 @@ export default function InfiniteCanvasPage() {
           </g>,
         )
       } else {
-        // Calculate the convergence point between the two parent paths
-        const convergenceY = node.position.y - 100
-        const convergenceX = nodeCenterX
-
-        // Stop point at the top edge of the merged node
-        const endY = node.position.y + 15
+        // Calculate the meeting point at the top edge of the merged node
+        const meetingX = nodeCenterX
+        const meetingY = node.position.y + 15 // Top edge with padding
 
         parentIds.forEach((parentId) => {
           const parent = nodes.find((n) => n.id === parentId)
@@ -307,37 +304,26 @@ export default function InfiniteCanvasPage() {
           const startX = parent.position.x + parentWidth / 2
           const startY = parent.position.y + parentHeight
 
-          // Calculate control points for smooth curve from parent to convergence point
-          const dx = convergenceX - startX
-          const dy = convergenceY - startY
-          const distance = Math.sqrt(dx * dx + dy * dy)
-          const curvature = Math.min(distance * 0.4, 120)
+          // Create smooth bezier curve from parent bottom directly to meeting point
+          const dx = meetingX - startX
+          const dy = meetingY - startY
 
-          const controlY = startY + dy * 0.6
+          // Control points for smooth S-curve that converges at the meeting point
+          const controlY1 = startY + dy * 0.5
+          const controlY2 = meetingY - 40 // Pull control point up slightly for smooth convergence
 
           connections.push(
             <path
               key={`${node.id}-${parentId}`}
-              d={`M ${startX} ${startY} Q ${startX} ${controlY}, ${convergenceX} ${convergenceY}`}
+              d={`M ${startX} ${startY} C ${startX} ${controlY1}, ${meetingX} ${controlY2}, ${meetingX} ${meetingY}`}
               stroke="#20b8cd"
               strokeWidth="2"
               fill="none"
               opacity="0.6"
+              markerEnd="url(#arrowhead)"
             />,
           )
         })
-
-        connections.push(
-          <path
-            key={`${node.id}-merged`}
-            d={`M ${convergenceX} ${convergenceY} L ${convergenceX} ${endY}`}
-            stroke="#20b8cd"
-            strokeWidth="2"
-            fill="none"
-            opacity="0.6"
-            markerEnd="url(#arrowhead)"
-          />,
-        )
       }
     })
 
