@@ -11,4 +11,5 @@ export interface ChatNodeType {
   isLoading: boolean
   model?: string
   usageType?: string
+  title?: string
 }

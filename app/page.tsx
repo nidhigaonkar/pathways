@@ -26,10 +26,13 @@ export default function InfiniteCanvasPage() {
       isLoading: false,
       model: "gpt4",
       usageType: "focus",
-      size: { width: 400, height: 500 }, // Added size property
+      size: { width: 400, height: 500 },
+      title: "AI Future Discussion",
     },
   ])
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
+  const [isMergeMode, setIsMergeMode] = useState(false)
+  const [mergeSourceId, setMergeSourceId] = useState<string | null>(null)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [isDragging, setIsDragging] = useState(false)
@@ -246,6 +249,50 @@ export default function InfiniteCanvasPage() {
       })
   }
 
+  const handleStartMerge = useCallback(
+    (nodeId: string) => {
+      if (!isMergeMode) {
+        setIsMergeMode(true)
+        setMergeSourceId(nodeId)
+      } else if (mergeSourceId && mergeSourceId !== nodeId) {
+        // Merge the two nodes
+        const sourceNode = nodes.find((n) => n.id === mergeSourceId)
+        const targetNode = nodes.find((n) => n.id === nodeId)
+
+        if (sourceNode && targetNode) {
+          const mergedNode: ChatNodeType = {
+            id: Date.now().toString(),
+            position: {
+              x: (sourceNode.position.x + targetNode.position.x) / 2,
+              y: (sourceNode.position.y + targetNode.position.y) / 2 - 100,
+            },
+            userMessage: `${sourceNode.userMessage}\n\n${targetNode.userMessage}`,
+            aiResponse: `Merged content:\n\n${sourceNode.aiResponse}\n\n${targetNode.aiResponse}`,
+            parentId: null,
+            connectionDirection: null,
+            expanded: true,
+            isActive: true,
+            isLoading: false,
+            model: sourceNode.model || "gpt4",
+            usageType: sourceNode.usageType || "focus",
+            size: { width: 400, height: 500 },
+            title: `${sourceNode.title || "Node " + sourceNode.id} + ${targetNode.title || "Node " + targetNode.id}`,
+          }
+
+          setNodes([...nodes, mergedNode])
+        }
+
+        setIsMergeMode(false)
+        setMergeSourceId(null)
+      } else {
+        // Cancel merge
+        setIsMergeMode(false)
+        setMergeSourceId(null)
+      }
+    },
+    [isMergeMode, mergeSourceId, nodes],
+  )
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#202222] flex flex-col">
       <CanvasNavbar />
@@ -307,6 +354,9 @@ export default function InfiniteCanvasPage() {
                 onUpdate={handleUpdateNode}
                 onToggleSelect={handleToggleSelect}
                 onCreateDirectional={handleCreateDirectional}
+                onStartMerge={handleStartMerge}
+                isMergeMode={isMergeMode}
+                mergeSourceId={mergeSourceId}
                 pan={pan}
                 zoom={zoom}
               />
@@ -318,12 +368,30 @@ export default function InfiniteCanvasPage() {
         <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none">
           <div className="bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#20b8cd]" />
-            <span>Ctrl+Click to create node • Drag to pan • Scroll to zoom</span>
+            <span>
+              {isMergeMode
+                ? "Click another node to merge"
+                : "Ctrl+Click to create • Drag to pan • Scroll to zoom • Click title to rename"}
+            </span>
           </div>
         </div>
 
+        {isMergeMode && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+            <Button
+              className="bg-yellow-500 hover:bg-yellow-600 text-black font-medium shadow-lg"
+              onClick={() => {
+                setIsMergeMode(false)
+                setMergeSourceId(null)
+              }}
+            >
+              Cancel Merge
+            </Button>
+          </div>
+        )}
+
         {/* Merge button when multiple nodes selected */}
-        {selectedNodes.length >= 2 && (
+        {selectedNodes.length >= 2 && !isMergeMode && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
             <Button
               className="bg-[#20b8cd] hover:bg-[#1a9db0] text-black font-medium shadow-lg"

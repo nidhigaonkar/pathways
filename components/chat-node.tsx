@@ -7,7 +7,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { X, Mic, Send, Check, Plus } from "lucide-react"
+import { X, Mic, Send, Check, Plus, GitMerge } from "lucide-react"
 import type { ChatNodeType } from "@/lib/types"
 
 interface ChatNodeProps {
@@ -18,6 +18,9 @@ interface ChatNodeProps {
   onUpdate: (nodeId: string, updates: Partial<ChatNodeType>) => void
   onToggleSelect: (nodeId: string) => void
   onCreateDirectional: (nodeId: string, direction: "top" | "right" | "bottom" | "left") => void
+  onStartMerge: (nodeId: string) => void
+  isMergeMode: boolean
+  mergeSourceId: string | null
   pan: { x: number; y: number }
   zoom: number
 }
@@ -30,6 +33,9 @@ export function ChatNode({
   onUpdate,
   onToggleSelect,
   onCreateDirectional,
+  onStartMerge,
+  isMergeMode,
+  mergeSourceId,
   pan,
   zoom,
 }: ChatNodeProps) {
@@ -40,11 +46,21 @@ export function ChatNode({
   const [resizeStart, setResizeStart] = useState({ mouseX: 0, mouseY: 0, width: 0, height: 0, x: 0, y: 0 })
   const [resizeDirection, setResizeDirection] = useState<"nw" | "ne" | "sw" | "se" | null>(null)
   const [isHovered, setIsHovered] = useState(false)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [titleInput, setTitleInput] = useState(node.title || `Node ${node.id}`)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const nodeRef = useRef<HTMLDivElement>(null)
+  const titleInputRef = useRef<HTMLInputElement>(null)
 
   const nodeWidth = node.size?.width || 400
   const nodeHeight = node.size?.height || 500
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isEditingTitle])
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button, textarea, input, select, .resize-handle")) return
@@ -166,6 +182,11 @@ export function ChatNode({
     }
   }, [isDragging, isResizing, resizeDirection, resizeStart, dragStart, node.id, onUpdate, zoom])
 
+  const handleTitleSave = () => {
+    onUpdate(node.id, { title: titleInput })
+    setIsEditingTitle(false)
+  }
+
   return (
     <motion.div
       ref={nodeRef}
@@ -251,10 +272,12 @@ export function ChatNode({
       <div
         className={`bg-[#1a1b1b] rounded-xl shadow-2xl overflow-hidden transition-all cursor-move h-full flex flex-col ${
           node.isActive ? "ring-2 ring-[#20b8cd] shadow-[0_0_20px_rgba(32,184,205,0.3)]" : ""
-        } ${isSelected ? "ring-2 ring-[#20b8cd]/60" : ""}`}
+        } ${isSelected ? "ring-2 ring-[#20b8cd]/60" : ""} ${
+          isMergeMode && mergeSourceId === node.id ? "ring-2 ring-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]" : ""
+        }`}
       >
         <div className="flex items-center justify-between p-3 border-b border-white/10">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -264,9 +287,49 @@ export function ChatNode({
             >
               {isSelected && <Check className="h-3 w-3 text-[#20b8cd]" />}
             </button>
-            <span className="text-xs text-white/60">Node {node.id}</span>
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleTitleSave()
+                  if (e.key === "Escape") {
+                    setTitleInput(node.title || `Node ${node.id}`)
+                    setIsEditingTitle(false)
+                  }
+                  e.stopPropagation()
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs text-white bg-white/10 px-2 py-1 rounded border border-white/20 focus:outline-none focus:border-[#20b8cd] flex-1"
+              />
+            ) : (
+              <span
+                className="text-xs text-white/80 cursor-text hover:text-white transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsEditingTitle(true)
+                }}
+              >
+                {node.title || `Node ${node.id}`}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-white/60 hover:text-yellow-400 hover:bg-white/5"
+              onClick={(e) => {
+                e.stopPropagation()
+                onStartMerge(node.id)
+              }}
+              title="Merge with another node"
+            >
+              <GitMerge className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
