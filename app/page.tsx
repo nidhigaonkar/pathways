@@ -296,6 +296,8 @@ export default function InfiniteCanvasPage() {
                 onUpdate={handleUpdateNode}
                 onToggleSelect={handleToggleSelect}
                 onCreateDirectional={handleCreateDirectional}
+                pan={pan}
+                zoom={zoom}
               />
             ))}
           </AnimatePresence>

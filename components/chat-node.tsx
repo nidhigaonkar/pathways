@@ -18,6 +18,8 @@ interface ChatNodeProps {
   onUpdate: (nodeId: string, updates: Partial<ChatNodeType>) => void
   onToggleSelect: (nodeId: string) => void
   onCreateDirectional: (nodeId: string, direction: "top" | "right" | "bottom" | "left") => void
+  pan: { x: number; y: number }
+  zoom: number
 }
 
 export function ChatNode({
@@ -28,10 +30,12 @@ export function ChatNode({
   onUpdate,
   onToggleSelect,
   onCreateDirectional,
+  pan,
+  zoom,
 }: ChatNodeProps) {
   const [input, setInput] = useState("")
   const [isDragging, setIsDragging] = useState(false)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [dragStart, setDragStart] = useState({ mouseX: 0, mouseY: 0, nodeX: 0, nodeY: 0 })
   const [isHovered, setIsHovered] = useState(false)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const nodeRef = useRef<HTMLDivElement>(null)
@@ -39,13 +43,12 @@ export function ChatNode({
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button, textarea, input, select")) return
     setIsDragging(true)
-    const rect = nodeRef.current?.getBoundingClientRect()
-    if (rect) {
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      })
-    }
+    setDragStart({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      nodeX: node.position.x,
+      nodeY: node.position.y,
+    })
     e.stopPropagation()
   }
 
@@ -84,10 +87,13 @@ export function ChatNode({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return
+      const deltaX = (e.clientX - dragStart.mouseX) / zoom
+      const deltaY = (e.clientY - dragStart.mouseY) / zoom
+
       onUpdate(node.id, {
         position: {
-          x: (e.clientX - dragOffset.x) / 1,
-          y: (e.clientY - dragOffset.y) / 1,
+          x: dragStart.nodeX + deltaX,
+          y: dragStart.nodeY + deltaY,
         },
       })
     }
@@ -105,16 +111,16 @@ export function ChatNode({
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("mouseup", handleMouseUp)
     }
-  }, [isDragging, dragOffset, node.id, onUpdate])
+  }, [isDragging, dragStart, node.id, onUpdate, zoom])
 
   return (
     <motion.div
       ref={nodeRef}
       className="chat-node absolute"
       style={{
-        left: node.position.x,
-        top: node.position.y,
-        width: 400,
+        left: node.position.x - pan.x,
+        top: node.position.y - pan.y,
+        width: 400 / zoom,
       }}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
