@@ -20,6 +20,7 @@ export default function InfiniteCanvasPage() {
       aiResponse:
         "The future of AI is incredibly exciting and transformative. We're moving towards more sophisticated systems that can understand context, reason across domains, and collaborate with humans in meaningful ways. Key trends include multimodal AI, improved reasoning capabilities, and more efficient models.",
       parentId: null,
+      connectionDirection: null,
       expanded: true,
       isActive: false,
       isLoading: false,
@@ -85,6 +86,7 @@ export default function InfiniteCanvasPage() {
           userMessage: "",
           aiResponse: "",
           parentId: null,
+          connectionDirection: null,
           expanded: true,
           isActive: true,
           isLoading: false,
@@ -116,6 +118,7 @@ export default function InfiniteCanvasPage() {
         userMessage: "",
         aiResponse: "",
         parentId,
+        connectionDirection: direction,
         expanded: true,
         isActive: true,
         isLoading: false,
@@ -140,6 +143,7 @@ export default function InfiniteCanvasPage() {
         userMessage: "",
         aiResponse: "",
         parentId,
+        connectionDirection: "right",
         expanded: true,
         isActive: true,
         isLoading: false,
@@ -183,8 +187,24 @@ export default function InfiniteCanvasPage() {
         const parent = nodes.find((n) => n.id === node.parentId)
         if (!parent) return null
 
-        const startX = parent.position.x + NODE_WIDTH / 2
-        const startY = parent.position.y + NODE_HEIGHT / 2
+        // Calculate start point based on connection direction
+        let startX = parent.position.x + NODE_WIDTH / 2
+        let startY = parent.position.y + NODE_HEIGHT / 2
+
+        if (node.connectionDirection === "top") {
+          startX = parent.position.x + NODE_WIDTH / 2
+          startY = parent.position.y
+        } else if (node.connectionDirection === "right") {
+          startX = parent.position.x + NODE_WIDTH
+          startY = parent.position.y + NODE_HEIGHT / 2
+        } else if (node.connectionDirection === "bottom") {
+          startX = parent.position.x + NODE_WIDTH / 2
+          startY = parent.position.y + NODE_HEIGHT
+        } else if (node.connectionDirection === "left") {
+          startX = parent.position.x
+          startY = parent.position.y + NODE_HEIGHT / 2
+        }
+
         const endX = node.position.x + NODE_WIDTH / 2
         const endY = node.position.y + NODE_HEIGHT / 2
 
