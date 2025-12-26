@@ -5,6 +5,7 @@ export interface ChatNodeType {
   userMessage: string
   aiResponse: string
   parentId: string | null
+  parentIds?: string[] // For merged nodes with multiple parents
   connectionDirection?: "top" | "right" | "bottom" | "left" | null
   expanded: boolean
   isActive: boolean

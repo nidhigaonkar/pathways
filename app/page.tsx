@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import type JSX from "jsx" // Declare the JSX variable before using it
 
 import { useState, useRef, useCallback } from "react"
 import { AnimatePresence } from "framer-motion"
@@ -20,6 +21,7 @@ export default function InfiniteCanvasPage() {
       aiResponse:
         "The future of AI is incredibly exciting and transformative. We're moving towards more sophisticated systems that can understand context, reason across domains, and collaborate with humans in meaningful ways. Key trends include multimodal AI, improved reasoning capabilities, and more efficient models.",
       parentId: null,
+      parentIds: null, // Updated to handle multiple parents
       connectionDirection: null,
       expanded: true,
       isActive: false,
@@ -90,6 +92,7 @@ export default function InfiniteCanvasPage() {
           userMessage: "",
           aiResponse: "",
           parentId: null,
+          parentIds: null, // Updated to handle multiple parents
           connectionDirection: null,
           expanded: true,
           isActive: true,
@@ -130,6 +133,7 @@ export default function InfiniteCanvasPage() {
         userMessage: "",
         aiResponse: "",
         parentId,
+        parentIds: null, // Updated to handle multiple parents
         connectionDirection: direction,
         expanded: true,
         isActive: true,
@@ -156,6 +160,7 @@ export default function InfiniteCanvasPage() {
         userMessage: "",
         aiResponse: "",
         parentId,
+        parentIds: null, // Updated to handle multiple parents
         connectionDirection: "right",
         expanded: true,
         isActive: true,
@@ -192,18 +197,26 @@ export default function InfiniteCanvasPage() {
   }, [])
 
   const renderConnections = () => {
-    return nodes
-      .filter((node) => node.parentId)
-      .map((node) => {
-        const parent = nodes.find((n) => n.id === node.parentId)
-        if (!parent) return null
+    const connections: JSX.Element[] = []
+
+    nodes.forEach((node) => {
+      const parentIds = node.parentIds || (node.parentId ? [node.parentId] : [])
+
+      if (parentIds.length === 0) return
+
+      const nodeWidth = node.size?.width || 400
+      const nodeHeight = node.size?.height || 500
+      const endX = node.position.x + nodeWidth / 2
+      const endY = node.position.y + nodeHeight / 2
+
+      if (parentIds.length === 1) {
+        // Single parent - normal arrow
+        const parent = nodes.find((n) => n.id === parentIds[0])
+        if (!parent) return
 
         const parentWidth = parent.size?.width || 400
         const parentHeight = parent.size?.height || 500
-        const nodeWidth = node.size?.width || 400
-        const nodeHeight = node.size?.height || 500
 
-        // Calculate start point based on connection direction
         let startX = parent.position.x + parentWidth / 2
         let startY = parent.position.y + parentHeight / 2
 
@@ -221,9 +234,6 @@ export default function InfiniteCanvasPage() {
           startY = parent.position.y + parentHeight / 2
         }
 
-        const endX = node.position.x + nodeWidth / 2
-        const endY = node.position.y + nodeHeight / 2
-
         const dx = endX - startX
         const dy = endY - startY
         const distance = Math.sqrt(dx * dx + dy * dy)
@@ -234,8 +244,8 @@ export default function InfiniteCanvasPage() {
         const controlX2 = startX + dx * 0.5
         const controlY2 = endY + curvature
 
-        return (
-          <g key={node.id}>
+        connections.push(
+          <g key={`${node.id}-${parentIds[0]}`}>
             <path
               d={`M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`}
               stroke="#20b8cd"
@@ -244,9 +254,64 @@ export default function InfiniteCanvasPage() {
               opacity="0.6"
             />
             <circle cx={endX} cy={endY} r="4" fill="#20b8cd" />
-          </g>
+          </g>,
         )
-      })
+      } else {
+        // Multiple parents - merge arrows
+        const mergePointY = endY - 80 // Point where arrows merge
+
+        parentIds.forEach((parentId, index) => {
+          const parent = nodes.find((n) => n.id === parentId)
+          if (!parent) return
+
+          const parentWidth = parent.size?.width || 400
+          const parentHeight = parent.size?.height || 500
+          const startX = parent.position.x + parentWidth / 2
+          const startY = parent.position.y + parentHeight / 2
+
+          // Calculate merge point offset for each parent
+          const mergeX = endX + (index === 0 ? -30 : 30)
+
+          const dx1 = mergeX - startX
+          const dy1 = mergePointY - startY
+          const distance1 = Math.sqrt(dx1 * dx1 + dy1 * dy1)
+          const curvature1 = Math.min(distance1 * 0.3, 80)
+
+          const controlX1 = startX + dx1 * 0.5
+          const controlY1 = startY + curvature1
+
+          connections.push(
+            <g key={`${node.id}-${parentId}`}>
+              {/* Arrow from parent to merge point */}
+              <path
+                d={`M ${startX} ${startY} C ${controlX1} ${controlY1}, ${mergeX} ${mergePointY - 20}, ${mergeX} ${mergePointY}`}
+                stroke="#20b8cd"
+                strokeWidth="2"
+                fill="none"
+                opacity="0.6"
+              />
+              <circle cx={startX} cy={startY} r="3" fill="#20b8cd" opacity="0.8" />
+            </g>,
+          )
+        })
+
+        // Single merged arrow from merge point to target
+        connections.push(
+          <g key={`${node.id}-merged`}>
+            <path
+              d={`M ${endX} ${mergePointY} L ${endX} ${endY}`}
+              stroke="#20b8cd"
+              strokeWidth="3"
+              fill="none"
+              opacity="0.8"
+            />
+            <circle cx={endX} cy={endY} r="5" fill="#20b8cd" />
+          </g>,
+        )
+      }
+    })
+
+    return connections
   }
 
   const handleStartMerge = useCallback(
@@ -269,6 +334,7 @@ export default function InfiniteCanvasPage() {
             userMessage: `${sourceNode.userMessage}\n\n${targetNode.userMessage}`,
             aiResponse: `Merged content:\n\n${sourceNode.aiResponse}\n\n${targetNode.aiResponse}`,
             parentId: null,
+            parentIds: [sourceNode.id, targetNode.id], // Track both parents
             connectionDirection: null,
             expanded: true,
             isActive: true,
