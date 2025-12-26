@@ -40,6 +40,7 @@ export default function InfiniteCanvasPage() {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const canvasRef = useRef<HTMLDivElement>(null)
+  const [searchQuery, setSearchQuery] = useState("") // Added search state
 
   // Handle canvas panning
   const handleMouseDown = useCallback(
@@ -220,7 +221,6 @@ export default function InfiniteCanvasPage() {
       const nodeCenterY = node.position.y + nodeHeight / 2
 
       if (parentIds.length === 1) {
-        // Single parent - normal arrow
         const parent = nodes.find((n) => n.id === parentIds[0])
         if (!parent) return
 
@@ -248,30 +248,24 @@ export default function InfiniteCanvasPage() {
         const dy = nodeCenterY - startY
         const angle = Math.atan2(dy, dx)
 
-        // Calculate intersection with node rectangle (accounting for rounded corners)
-        const padding = 15 // Stop arrow this many pixels before the edge
+        const padding = 15
         let endX = nodeCenterX
         let endY = nodeCenterY
 
-        // Determine which edge the arrow is approaching
         const absAngle = Math.abs(angle)
         const halfWidth = nodeWidth / 2
         const halfHeight = nodeHeight / 2
 
         if (absAngle < Math.atan(halfHeight / halfWidth)) {
-          // Approaching from right
           endX = node.position.x + nodeWidth - padding
           endY = nodeCenterY + (endX - nodeCenterX) * Math.tan(angle)
         } else if (absAngle > Math.PI - Math.atan(halfHeight / halfWidth)) {
-          // Approaching from left
           endX = node.position.x + padding
           endY = nodeCenterY + (endX - nodeCenterX) * Math.tan(angle)
         } else if (angle > 0) {
-          // Approaching from bottom
           endY = node.position.y + nodeHeight - padding
           endX = nodeCenterX + (endY - nodeCenterY) / Math.tan(angle)
         } else {
-          // Approaching from top
           endY = node.position.y + padding
           endX = nodeCenterX + (endY - nodeCenterY) / Math.tan(angle)
         }
@@ -297,53 +291,52 @@ export default function InfiniteCanvasPage() {
           </g>,
         )
       } else {
-        // Multiple parents - merge arrows
-        const mergePointY = node.position.y - 80
-        const endY = node.position.y + 15 // Consistent padding with single arrows
+        // Calculate the convergence point between the two parent paths
+        const convergenceY = node.position.y - 100
+        const convergenceX = nodeCenterX
 
-        parentIds.forEach((parentId, index) => {
+        // Stop point at the top edge of the merged node
+        const endY = node.position.y + 15
+
+        parentIds.forEach((parentId) => {
           const parent = nodes.find((n) => n.id === parentId)
           if (!parent) return
 
           const parentWidth = parent.size?.width || 400
           const parentHeight = parent.size?.height || 500
           const startX = parent.position.x + parentWidth / 2
-          const startY = parent.position.y + parentHeight / 2
+          const startY = parent.position.y + parentHeight
 
-          const mergeX = nodeCenterX + (index === 0 ? -30 : 30)
+          // Calculate control points for smooth curve from parent to convergence point
+          const dx = convergenceX - startX
+          const dy = convergenceY - startY
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          const curvature = Math.min(distance * 0.4, 120)
 
-          const dx1 = mergeX - startX
-          const dy1 = mergePointY - startY
-          const distance1 = Math.sqrt(dx1 * dx1 + dy1 * dy1)
-          const curvature1 = Math.min(distance1 * 0.3, 80)
-
-          const controlX1 = startX + dx1 * 0.5
-          const controlY1 = startY + curvature1
+          const controlY = startY + dy * 0.6
 
           connections.push(
-            <g key={`${node.id}-${parentId}`}>
-              <path
-                d={`M ${startX} ${startY} C ${controlX1} ${controlY1}, ${mergeX} ${mergePointY - 20}, ${mergeX} ${mergePointY}`}
-                stroke="#20b8cd"
-                strokeWidth="2"
-                fill="none"
-                opacity="0.6"
-              />
-            </g>,
+            <path
+              key={`${node.id}-${parentId}`}
+              d={`M ${startX} ${startY} Q ${startX} ${controlY}, ${convergenceX} ${convergenceY}`}
+              stroke="#20b8cd"
+              strokeWidth="2"
+              fill="none"
+              opacity="0.6"
+            />,
           )
         })
 
         connections.push(
-          <g key={`${node.id}-merged`}>
-            <path
-              d={`M ${nodeCenterX} ${mergePointY} L ${nodeCenterX} ${endY}`}
-              stroke="#20b8cd"
-              strokeWidth="3"
-              fill="none"
-              opacity="0.8"
-              markerEnd="url(#arrowhead)"
-            />
-          </g>,
+          <path
+            key={`${node.id}-merged`}
+            d={`M ${convergenceX} ${convergenceY} L ${convergenceX} ${endY}`}
+            stroke="#20b8cd"
+            strokeWidth="2"
+            fill="none"
+            opacity="0.6"
+            markerEnd="url(#arrowhead)"
+          />,
         )
       }
     })
@@ -403,8 +396,7 @@ export default function InfiniteCanvasPage() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#202222] flex flex-col">
-      <CanvasNavbar />
-
+      <CanvasNavbar searchQuery={searchQuery} onSearchChange={setSearchQuery} /> {/* Pass search props to navbar */}
       <div
         ref={canvasRef}
         className="flex-1 relative cursor-grab active:cursor-grabbing select-none"
@@ -465,23 +457,32 @@ export default function InfiniteCanvasPage() {
           }}
         >
           <AnimatePresence>
-            {nodes.map((node) => (
-              <ChatNode
-                key={node.id}
-                node={node}
-                isSelected={selectedNodes.includes(node.id)}
-                onFork={handleForkNode}
-                onDelete={handleDeleteNode}
-                onUpdate={handleUpdateNode}
-                onToggleSelect={handleToggleSelect}
-                onCreateDirectional={handleCreateDirectional}
-                onStartMerge={handleStartMerge}
-                isMergeMode={isMergeMode}
-                mergeSourceId={mergeSourceId}
-                pan={pan}
-                zoom={zoom}
-              />
-            ))}
+            {nodes.map((node) => {
+              const matchesSearch =
+                !searchQuery ||
+                (node.title?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+                node.userMessage.toLowerCase().includes(searchQuery.toLowerCase())
+
+              return (
+                <ChatNode
+                  key={node.id}
+                  node={node}
+                  isSelected={selectedNodes.includes(node.id)}
+                  onFork={handleForkNode}
+                  onDelete={handleDeleteNode}
+                  onUpdate={handleUpdateNode}
+                  onToggleSelect={handleToggleSelect}
+                  onCreateDirectional={handleCreateDirectional}
+                  onStartMerge={handleStartMerge}
+                  isMergeMode={isMergeMode}
+                  mergeSourceId={mergeSourceId}
+                  pan={pan}
+                  zoom={zoom}
+                  isSearchMatch={matchesSearch}
+                  isSearching={!!searchQuery}
+                />
+              )
+            })}
           </AnimatePresence>
         </div>
 
@@ -524,7 +525,6 @@ export default function InfiniteCanvasPage() {
           </div>
         )}
       </div>
-
       {/* Minimap */}
       <Minimap nodes={nodes} pan={pan} zoom={zoom} />
     </div>

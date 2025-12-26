@@ -23,6 +23,8 @@ interface ChatNodeProps {
   mergeSourceId: string | null
   pan: { x: number; y: number }
   zoom: number
+  isSearchMatch?: boolean // Added search match prop
+  isSearching?: boolean // Added search active prop
 }
 
 export function ChatNode({
@@ -38,6 +40,8 @@ export function ChatNode({
   mergeSourceId,
   pan,
   zoom,
+  isSearchMatch = true, // Default to true when not searching
+  isSearching = false, // Default to false
 }: ChatNodeProps) {
   const [input, setInput] = useState("")
   const [isDragging, setIsDragging] = useState(false)
@@ -199,9 +203,11 @@ export function ChatNode({
         top: `${node.position.y}px`,
         width: `${nodeWidth}px`,
         height: `${nodeHeight}px`,
+        opacity: isSearching && !isSearchMatch ? 0.3 : 1, // Dim non-matching nodes during search
+        transition: "opacity 0.2s ease-in-out", // Smooth transition for opacity changes
       }}
       initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={{ opacity: isSearching && !isSearchMatch ? 0.3 : 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
@@ -277,7 +283,7 @@ export function ChatNode({
           node.isActive ? "ring-2 ring-[#20b8cd] shadow-[0_0_20px_rgba(32,184,205,0.3)]" : ""
         } ${isSelected ? "ring-2 ring-[#20b8cd]/60" : ""} ${
           isMergeMode && mergeSourceId === node.id ? "ring-2 ring-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]" : ""
-        }`}
+        } ${isSearching && isSearchMatch ? "ring-2 ring-[#20b8cd] shadow-[0_0_20px_rgba(32,184,205,0.3)]" : ""}`}
       >
         <div className="flex items-center justify-between p-3 border-b border-white/10">
           <div className="flex items-center gap-2 flex-1">

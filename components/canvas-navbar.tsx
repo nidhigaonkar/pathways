@@ -1,9 +1,18 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Search, User } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Search, User, X } from "lucide-react"
+import { useState } from "react"
 
-export function CanvasNavbar() {
+interface CanvasNavbarProps {
+  searchQuery: string
+  onSearchChange: (query: string) => void
+}
+
+export function CanvasNavbar({ searchQuery, onSearchChange }: CanvasNavbarProps) {
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+
   return (
     <nav className="h-[60px] bg-[#1a1b1b] border-b border-white/10 flex items-center justify-between px-6">
       {/* Logo */}
@@ -13,17 +22,43 @@ export function CanvasNavbar() {
             Pathways
           </span>
         </div>
-
-        {/* Mode selector */}
-
-        {/* Model selector */}
       </div>
 
       {/* Right side */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
-          <Search className="h-5 w-5" />
-        </Button>
+        {isSearchOpen ? (
+          <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 min-w-[300px]">
+            <Search className="h-4 w-4 text-[#20b8cd]" />
+            <Input
+              type="text"
+              placeholder="Search nodes..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="bg-transparent border-none text-white placeholder:text-white/40 focus-visible:ring-0 focus-visible:ring-offset-0 h-6 px-0"
+              autoFocus
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-white/60 hover:text-white hover:bg-white/10"
+              onClick={() => {
+                setIsSearchOpen(false)
+                onSearchChange("")
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10"
+            onClick={() => setIsSearchOpen(true)}
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
           <User className="h-5 w-5" />
         </Button>
