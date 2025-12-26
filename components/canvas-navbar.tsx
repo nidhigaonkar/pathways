@@ -9,10 +9,9 @@ export function CanvasNavbar() {
       {/* Logo */}
       <div className="flex items-center gap-8">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#20b8cd] rounded-lg flex items-center justify-center">
-            <span className="text-black font-bold text-lg">A</span>
-          </div>
-          <span className="text-white font-semibold text-lg">AI Canvas</span>
+          <span className="text-[#20b8cd] font-bold text-2xl tracking-tight" style={{ fontFamily: "Georgia, serif" }}>
+            Pathways
+          </span>
         </div>
 
         {/* Mode selector */}
