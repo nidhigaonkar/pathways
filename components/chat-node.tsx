@@ -64,6 +64,9 @@ export function ChatNode({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button, textarea, input, select, .resize-handle")) return
+
+    onUpdate(node.id, { isActive: true })
+
     setIsDragging(true)
     setDragStart({
       mouseX: e.clientX,
@@ -102,7 +105,7 @@ export function ChatNode({
         aiResponse:
           "This is a simulated AI response. In a real implementation, this would connect to an AI service to generate contextual responses based on your query.",
         isLoading: false,
-        isActive: false,
+        isActive: true, // Keep node active after response
       })
     }, 1500)
   }

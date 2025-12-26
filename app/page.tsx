@@ -45,6 +45,10 @@ export default function InfiniteCanvasPage() {
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if ((e.target as HTMLElement).closest(".chat-node")) return
+
+      // Deactivate all nodes when clicking canvas
+      setNodes((prev) => prev.map((n) => ({ ...n, isActive: false })))
+
       setIsDragging(true)
       setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
     },
@@ -134,7 +138,7 @@ export default function InfiniteCanvasPage() {
         parentIds: null, // Updated to handle multiple parents
         connectionDirection: direction,
         expanded: true,
-        isActive: true,
+        isActive: false, // Don't auto-activate new nodes
         isLoading: false,
         model: parent.model || "gpt4",
         usageType: parent.usageType || "focus",
@@ -161,7 +165,7 @@ export default function InfiniteCanvasPage() {
         parentIds: null, // Updated to handle multiple parents
         connectionDirection: "right",
         expanded: true,
-        isActive: true,
+        isActive: false, // Don't auto-activate new nodes
         isLoading: false,
         model: parent.model || "gpt4",
         usageType: parent.usageType || "focus",
@@ -184,12 +188,20 @@ export default function InfiniteCanvasPage() {
   // Update node
   const handleUpdateNode = useCallback(
     (nodeId: string, updates: Partial<ChatNodeType>) => {
-      setNodes(nodes.map((n) => (n.id === nodeId ? { ...n, ...updates } : n)))
+      setNodes(
+        nodes.map((n) => {
+          if (n.id === nodeId && updates.isActive === true) {
+            return { ...n, ...updates }
+          } else if (n.id !== nodeId && updates.isActive === true) {
+            return { ...n, isActive: false }
+          }
+          return n.id === nodeId ? { ...n, ...updates } : n
+        }),
+      )
     },
     [nodes],
   )
 
-  // Toggle node selection
   const handleToggleSelect = useCallback((nodeId: string) => {
     setSelectedNodes((prev) => (prev.includes(nodeId) ? prev.filter((id) => id !== nodeId) : [...prev, nodeId]))
   }, [])
@@ -204,8 +216,8 @@ export default function InfiniteCanvasPage() {
 
       const nodeWidth = node.size?.width || 400
       const nodeHeight = node.size?.height || 500
-      const endX = node.position.x + nodeWidth / 2
-      const endY = node.position.y + nodeHeight / 2
+      const nodeCenterX = node.position.x + nodeWidth / 2
+      const nodeCenterY = node.position.y + nodeHeight / 2
 
       if (parentIds.length === 1) {
         // Single parent - normal arrow
@@ -232,8 +244,38 @@ export default function InfiniteCanvasPage() {
           startY = parent.position.y + parentHeight / 2
         }
 
-        const dx = endX - startX
-        const dy = endY - startY
+        const dx = nodeCenterX - startX
+        const dy = nodeCenterY - startY
+        const angle = Math.atan2(dy, dx)
+
+        // Calculate intersection with node rectangle (accounting for rounded corners)
+        const padding = 15 // Stop arrow this many pixels before the edge
+        let endX = nodeCenterX
+        let endY = nodeCenterY
+
+        // Determine which edge the arrow is approaching
+        const absAngle = Math.abs(angle)
+        const halfWidth = nodeWidth / 2
+        const halfHeight = nodeHeight / 2
+
+        if (absAngle < Math.atan(halfHeight / halfWidth)) {
+          // Approaching from right
+          endX = node.position.x + nodeWidth - padding
+          endY = nodeCenterY + (endX - nodeCenterX) * Math.tan(angle)
+        } else if (absAngle > Math.PI - Math.atan(halfHeight / halfWidth)) {
+          // Approaching from left
+          endX = node.position.x + padding
+          endY = nodeCenterY + (endX - nodeCenterX) * Math.tan(angle)
+        } else if (angle > 0) {
+          // Approaching from bottom
+          endY = node.position.y + nodeHeight - padding
+          endX = nodeCenterX + (endY - nodeCenterY) / Math.tan(angle)
+        } else {
+          // Approaching from top
+          endY = node.position.y + padding
+          endX = nodeCenterX + (endY - nodeCenterY) / Math.tan(angle)
+        }
+
         const distance = Math.sqrt(dx * dx + dy * dy)
         const curvature = Math.min(distance * 0.3, 100)
 
@@ -242,37 +284,22 @@ export default function InfiniteCanvasPage() {
         const controlX2 = startX + dx * 0.5
         const controlY2 = endY + curvature
 
-        // Calculate angle for arrowhead
-        const angle = Math.atan2(dy, dx)
-
         connections.push(
           <g key={`${node.id}-${parentIds[0]}`}>
-            <defs>
-              <marker
-                id={`arrowhead-${node.id}`}
-                markerWidth="10"
-                markerHeight="10"
-                refX="9"
-                refY="3"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M0,0 L0,6 L9,3 z" fill="#20b8cd" />
-              </marker>
-            </defs>
             <path
               d={`M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`}
               stroke="#20b8cd"
               strokeWidth="2"
               fill="none"
               opacity="0.6"
-              markerEnd={`url(#arrowhead-${node.id})`}
+              markerEnd="url(#arrowhead)"
             />
           </g>,
         )
       } else {
         // Multiple parents - merge arrows
-        const mergePointY = endY - 80 // Point where arrows merge
+        const mergePointY = node.position.y - 80
+        const endY = node.position.y + 15 // Consistent padding with single arrows
 
         parentIds.forEach((parentId, index) => {
           const parent = nodes.find((n) => n.id === parentId)
@@ -283,8 +310,7 @@ export default function InfiniteCanvasPage() {
           const startX = parent.position.x + parentWidth / 2
           const startY = parent.position.y + parentHeight / 2
 
-          // Calculate merge point offset for each parent
-          const mergeX = endX + (index === 0 ? -30 : 30)
+          const mergeX = nodeCenterX + (index === 0 ? -30 : 30)
 
           const dx1 = mergeX - startX
           const dy1 = mergePointY - startY
@@ -296,7 +322,6 @@ export default function InfiniteCanvasPage() {
 
           connections.push(
             <g key={`${node.id}-${parentId}`}>
-              {/* Arrow from parent to merge point */}
               <path
                 d={`M ${startX} ${startY} C ${controlX1} ${controlY1}, ${mergeX} ${mergePointY - 20}, ${mergeX} ${mergePointY}`}
                 stroke="#20b8cd"
@@ -310,26 +335,13 @@ export default function InfiniteCanvasPage() {
 
         connections.push(
           <g key={`${node.id}-merged`}>
-            <defs>
-              <marker
-                id={`arrowhead-merged-${node.id}`}
-                markerWidth="12"
-                markerHeight="12"
-                refX="11"
-                refY="3"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M0,0 L0,6 L9,3 z" fill="#20b8cd" />
-              </marker>
-            </defs>
             <path
-              d={`M ${endX} ${mergePointY} L ${endX} ${endY}`}
+              d={`M ${nodeCenterX} ${mergePointY} L ${nodeCenterX} ${endY}`}
               stroke="#20b8cd"
               strokeWidth="3"
               fill="none"
               opacity="0.8"
-              markerEnd={`url(#arrowhead-merged-${node.id})`}
+              markerEnd="url(#arrowhead)"
             />
           </g>,
         )
@@ -367,7 +379,7 @@ export default function InfiniteCanvasPage() {
             parentIds: [sourceNode.id, targetNode.id], // Track both parents
             connectionDirection: null,
             expanded: true,
-            isActive: true,
+            isActive: false, // Don't auto-activate merged nodes
             isLoading: false,
             model: sourceNode.model || "gpt4",
             usageType: sourceNode.usageType || "focus",
@@ -421,6 +433,19 @@ export default function InfiniteCanvasPage() {
             height: "100%",
           }}
         >
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="3"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <polygon points="0 0, 10 3, 0 6" fill="#20b8cd" />
+            </marker>
+          </defs>
           <g
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
@@ -486,7 +511,6 @@ export default function InfiniteCanvasPage() {
           </div>
         )}
 
-        {/* Merge button when multiple nodes selected */}
         {selectedNodes.length >= 2 && !isMergeMode && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
             <Button
