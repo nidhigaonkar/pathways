@@ -106,17 +106,24 @@ export default function InfiniteCanvasPage() {
       const parent = nodes.find((n) => n.id === parentId)
       if (!parent) return
 
+      const parentWidth = parent.size?.width || 400
+      const parentHeight = parent.size?.height || 500
+      const spacing = 100 // Additional spacing between nodes
+
       const offsets = {
-        top: { x: 0, y: -300 },
-        right: { x: 500, y: 0 },
-        bottom: { x: 0, y: 300 },
-        left: { x: -500, y: 0 },
+        top: { x: 0, y: -(parentHeight / 2 + 250 + spacing) },
+        right: { x: parentWidth / 2 + 200 + spacing, y: 0 },
+        bottom: { x: 0, y: parentHeight / 2 + 250 + spacing },
+        left: { x: -(parentWidth / 2 + 200 + spacing), y: 0 },
       }
 
       const offset = offsets[direction]
       const newNode: ChatNodeType = {
         id: Date.now().toString(),
-        position: { x: parent.position.x + offset.x, y: parent.position.y + offset.y },
+        position: {
+          x: parent.position.x + parentWidth / 2 + offset.x - 200, // Center-align the new node
+          y: parent.position.y + parentHeight / 2 + offset.y - 250, // Center-align the new node
+        },
         userMessage: "",
         aiResponse: "",
         parentId,
@@ -126,7 +133,7 @@ export default function InfiniteCanvasPage() {
         isLoading: false,
         model: parent.model || "gpt4",
         usageType: parent.usageType || "focus",
-        size: { width: 400, height: 500 }, // Added size property
+        size: { width: 400, height: 500 },
       }
       console.log("[v0] Creating node with parent", parentId, "in direction", direction)
       setNodes([...nodes, newNode])
