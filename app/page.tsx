@@ -17,7 +17,18 @@ export default function InfiniteCanvasPage() {
     {
       id: "1",
       position: { x: 600, y: 300 },
-      userMessage: "What is the future of AI?",
+      messages: [
+        {
+          role: "user",
+          content: "What is the future of AI?",
+        },
+        {
+          role: "assistant",
+          content:
+            "The future of AI is incredibly exciting and transformative. We're moving towards more sophisticated systems that can understand context, reason across domains, and collaborate with humans in meaningful ways. Key trends include multimodal AI, improved reasoning capabilities, and more efficient models.",
+        },
+      ],
+      userMessage: "EX: What is the future of AI?", // Backward compatibility
       aiResponse:
         "The future of AI is incredibly exciting and transformative. We're moving towards more sophisticated systems that can understand context, reason across domains, and collaborate with humans in meaningful ways. Key trends include multimodal AI, improved reasoning capabilities, and more efficient models.",
       parentId: null,
@@ -93,6 +104,7 @@ export default function InfiniteCanvasPage() {
       const newNode: ChatNodeType = {
         id: Date.now().toString(),
         position: { x, y },
+        messages: [],
         userMessage: "",
         aiResponse: "",
         parentId: null,
@@ -135,6 +147,7 @@ export default function InfiniteCanvasPage() {
           x: parent.position.x + offset.x,
           y: parent.position.y + offset.y,
         },
+        messages: [],
         userMessage: "",
         aiResponse: "",
         parentId,
@@ -165,6 +178,7 @@ export default function InfiniteCanvasPage() {
           x: parent.position.x + (parent.size?.width || 400) + 160, // gap so arrowhead is visible
           y: parent.position.y + (parent.size?.height || 500) / 2 - 250,
         },
+        messages: [],
         userMessage: "",
         aiResponse: "",
         parentId,
@@ -394,14 +408,21 @@ export default function InfiniteCanvasPage() {
             sourceNode.position.y + (sourceNode.size?.height || 500),
             targetNode.position.y + (targetNode.size?.height || 500),
           )
+          // Merge messages from both source nodes
+          const mergedMessages = [
+            ...(sourceNode.messages || []),
+            ...(targetNode.messages || []),
+          ]
+          
           const mergedNode: ChatNodeType = {
             id: Date.now().toString(),
             position: {
               x: centerX,
               y: maxY + 220, // Extra spacing so arrowheads stay visible
             },
-            userMessage: `${sourceNode.userMessage}\n\n${targetNode.userMessage}`,
-            aiResponse: `Merged content:\n\n${sourceNode.aiResponse}\n\n${targetNode.aiResponse}`,
+            messages: mergedMessages,
+            userMessage: `${sourceNode.userMessage}\n\n${targetNode.userMessage}`, // Backward compatibility
+            aiResponse: `Merged content:\n\n${sourceNode.aiResponse}\n\n${targetNode.aiResponse}`, // Backward compatibility
             parentId: null,
             parentIds: [sourceNode.id, targetNode.id], // Track both parents
             connectionDirection: null,

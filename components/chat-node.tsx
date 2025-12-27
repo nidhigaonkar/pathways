@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { X, Mic, Send, Check, Plus, GitMerge } from "lucide-react"
-import type { ChatNodeType } from "@/lib/types"
+import type { ChatNodeType, ChatMessage } from "@/lib/types"
 
 interface ChatNodeProps {
   node: ChatNodeType
@@ -95,23 +95,63 @@ export function ChatNode({
     })
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!input.trim()) return
+    const userMessage = input.trim()
+    
+    // Get current messages or initialize empty array
+    const currentMessages = node.messages || []
+    
+    // Add user message to conversation
+    const updatedMessages = [...currentMessages, { role: 'user' as const, content: userMessage }]
+    
     onUpdate(node.id, {
-      userMessage: input,
+      messages: updatedMessages,
       isLoading: true,
     })
     setInput("")
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/perplexity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: updatedMessages,
+          model: node.model || 'sonar',
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      const aiResponse = data.response || 'No response generated'
+      
+      // Add AI response to conversation
+      const finalMessages = [...updatedMessages, { role: 'assistant' as const, content: aiResponse }]
+      
       onUpdate(node.id, {
-        aiResponse:
-          "This is a simulated AI response. In a real implementation, this would connect to an AI service to generate contextual responses based on your query.",
+        messages: finalMessages,
         isLoading: false,
         isActive: true, // Keep node active after response
       })
-    }, 1500)
+    } catch (error) {
+      console.error('Error calling Perplexity API:', error)
+      // Add error message to conversation
+      const errorMessages = [...updatedMessages, { 
+        role: 'assistant' as const, 
+        content: 'Sorry, there was an error generating a response. Please try again.' 
+      }]
+      
+      onUpdate(node.id, {
+        messages: errorMessages,
+        isLoading: false,
+        isActive: true,
+      })
+    }
   }
 
   const handleMouseEnter = () => {
@@ -367,15 +407,32 @@ export function ChatNode({
           </Select>
         </div>
 
-        <div className="p-4 space-y-4 flex-1 overflow-y-auto">
-          {node.userMessage && (
-            <div className="flex justify-end">
-              <div className="bg-[#20b8cd] text-black px-4 py-2 rounded-xl max-w-[80%] text-sm break-words">
-                {node.userMessage}
+        <div 
+          className="p-4 space-y-4 flex-1 overflow-y-auto"
+          onWheel={(e) => {
+            // Stop scroll events from propagating to canvas zoom
+            e.stopPropagation()
+          }}
+        >
+          {/* Display conversation history */}
+          {(node.messages || []).map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`px-4 py-2 rounded-xl max-w-[80%] text-sm break-words ${
+                  message.role === 'user'
+                    ? 'bg-[#20b8cd] text-black'
+                    : 'bg-white/5 text-white'
+                }`}
+              >
+                {message.content}
               </div>
             </div>
-          )}
+          ))}
 
+          {/* Show loading indicator when waiting for response */}
           {node.isLoading && (
             <div className="flex items-center gap-2 text-white/60 text-sm">
               <div className="flex gap-1">
@@ -387,7 +444,15 @@ export function ChatNode({
             </div>
           )}
 
-          {node.aiResponse && !node.isLoading && (
+          {/* Backward compatibility: show old userMessage/aiResponse if messages array doesn't exist */}
+          {(!node.messages || node.messages.length === 0) && node.userMessage && (
+            <div className="flex justify-end">
+              <div className="bg-[#20b8cd] text-black px-4 py-2 rounded-xl max-w-[80%] text-sm break-words">
+                {node.userMessage}
+              </div>
+            </div>
+          )}
+          {(!node.messages || node.messages.length === 0) && node.aiResponse && !node.isLoading && (
             <div className="bg-white/5 text-white px-4 py-3 rounded-xl text-sm leading-relaxed break-words">
               {node.aiResponse}
             </div>
