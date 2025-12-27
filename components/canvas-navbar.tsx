@@ -2,15 +2,16 @@
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, User, X } from "lucide-react"
+import { Search, User, X, Maximize2 } from "lucide-react"
 import { useState } from "react"
 
 interface CanvasNavbarProps {
   searchQuery: string
   onSearchChange: (query: string) => void
+  onZoomToFit?: () => void
 }
 
-export function CanvasNavbar({ searchQuery, onSearchChange }: CanvasNavbarProps) {
+export function CanvasNavbar({ searchQuery, onSearchChange, onZoomToFit }: CanvasNavbarProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   return (
@@ -26,6 +27,17 @@ export function CanvasNavbar({ searchQuery, onSearchChange }: CanvasNavbarProps)
 
       {/* Right side */}
       <div className="flex items-center gap-3">
+        {onZoomToFit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10"
+            onClick={onZoomToFit}
+            title="Zoom to fit all nodes"
+          >
+            <Maximize2 className="h-5 w-5" />
+          </Button>
+        )}
         {isSearchOpen ? (
           <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 min-w-[300px]">
             <Search className="h-4 w-4 text-[#20b8cd]" />

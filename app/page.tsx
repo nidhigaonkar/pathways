@@ -380,9 +380,57 @@ export default function InfiniteCanvasPage() {
     [isMergeMode, mergeSourceId, nodes],
   )
 
+  const handleZoomToFit = useCallback(() => {
+    if (nodes.length === 0) return
+
+    // Calculate bounding box of all nodes
+    let minX = Number.POSITIVE_INFINITY
+    let minY = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let maxY = Number.NEGATIVE_INFINITY
+
+    nodes.forEach((node) => {
+      const nodeWidth = node.size?.width || 400
+      const nodeHeight = node.size?.height || 500
+
+      minX = Math.min(minX, node.position.x)
+      minY = Math.min(minY, node.position.y)
+      maxX = Math.max(maxX, node.position.x + nodeWidth)
+      maxY = Math.max(maxY, node.position.y + nodeHeight)
+    })
+
+    // Add padding around the content
+    const padding = 100
+    const contentWidth = maxX - minX + padding * 2
+    const contentHeight = maxY - minY + padding * 2
+
+    // Get viewport dimensions
+    const viewportWidth = canvasRef.current?.clientWidth || window.innerWidth
+    const viewportHeight = (canvasRef.current?.clientHeight || window.innerHeight) - 60 // Account for navbar
+
+    // Calculate zoom to fit
+    const zoomX = viewportWidth / contentWidth
+    const zoomY = viewportHeight / contentHeight
+    const newZoom = Math.min(Math.max(zoomX, zoomY) * 0.9, 1) // 0.9 for some breathing room, max 1x
+
+    // Calculate pan to center the content
+    const contentCenterX = (minX + maxX) / 2
+    const contentCenterY = (minY + maxY) / 2
+    const viewportCenterX = viewportWidth / 2
+    const viewportCenterY = viewportHeight / 2
+
+    const newPan = {
+      x: viewportCenterX - contentCenterX * newZoom,
+      y: viewportCenterY - contentCenterY * newZoom,
+    }
+
+    setZoom(newZoom)
+    setPan(newPan)
+  }, [nodes])
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#202222] flex flex-col">
-      <CanvasNavbar searchQuery={searchQuery} onSearchChange={setSearchQuery} /> {/* Pass search props to navbar */}
+      <CanvasNavbar searchQuery={searchQuery} onSearchChange={setSearchQuery} onZoomToFit={handleZoomToFit} />
       <div
         ref={canvasRef}
         className="flex-1 relative cursor-grab active:cursor-grabbing select-none"
