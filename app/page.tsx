@@ -250,7 +250,10 @@ export default function InfiniteCanvasPage() {
         const parentCenterX = parent.position.x + parentWidth / 2
         const parentCenterY = parent.position.y + parentHeight / 2
 
-        const padding = 50
+        // Arrowhead size - the marker has refX="9" with markerUnits="strokeWidth" and strokeWidth="2"
+        // So the tip is 9 * 2 = 18 pixels from the path end
+        const borderOffset = 0 // Arrow should touch the border exactly
+        const arrowheadTipSize = 18 // Size of arrowhead tip from marker (refX="9" * strokeWidth="2")
 
         // Calculate the difference between centers
         const dx = nodeCenterX - parentCenterX
@@ -281,13 +284,13 @@ export default function InfiniteCanvasPage() {
             startX = parentCenterX
             startY = parentBottom
             endX = nodeCenterX
-            endY = nodeTop + padding
+            endY = nodeTop + borderOffset
           } else {
             // Child is above parent - connect parent top to child bottom
             startX = parentCenterX
             startY = parentTop
             endX = nodeCenterX
-            endY = nodeBottom - padding
+            endY = nodeBottom - borderOffset
           }
         } else {
           // Primarily horizontal connection
@@ -295,23 +298,25 @@ export default function InfiniteCanvasPage() {
             // Child is to the right of parent - connect parent right to child left
             startX = parentRight
             startY = parentCenterY
-            endX = nodeLeft + padding
+            endX = nodeLeft + borderOffset
             endY = nodeCenterY
           } else {
             // Child is to the left of parent - connect parent left to child right
             startX = parentLeft
             startY = parentCenterY
-            endX = nodeRight - padding
+            endX = nodeRight - borderOffset
             endY = nodeCenterY
           }
         }
 
-        // Pull the end point back slightly so the arrowhead tip is visible
+        // Adjust endpoint so arrowhead tip touches the border (not the base)
+        // The arrowhead marker has refX="9", so we need to pull back by arrowhead tip size
         const endDx = endX - startX
         const endDy = endY - startY
         const endDist = Math.sqrt(endDx * endDx + endDy * endDy) || 1
-        endX -= (endDx / endDist) * arrowHeadOffset
-        endY -= (endDy / endDist) * arrowHeadOffset
+        // Pull back by arrowhead tip size so the tip touches the border
+        endX -= (endDx / endDist) * arrowheadTipSize
+        endY -= (endDy / endDist) * arrowheadTipSize
 
         // Create smooth bezier curve
         const distance = Math.sqrt(dx * dx + dy * dy)
@@ -348,7 +353,8 @@ export default function InfiniteCanvasPage() {
       } else {
         // Calculate the meeting point at the top edge of the merged node
         const meetingX = nodeCenterX
-        const meetingY = node.position.y + 50 // Top edge with padding
+        const meetingY = node.position.y // Top edge - no padding, arrow will touch border
+        const arrowheadTipSize = 18 // Size of arrowhead tip from marker (refX="9" * strokeWidth="2")
 
         parentIds.forEach((parentId) => {
           const parent = nodes.find((n) => n.id === parentId)
@@ -363,16 +369,16 @@ export default function InfiniteCanvasPage() {
           let endX = meetingX
           let endY = meetingY
 
-          // Pull the end point back slightly so the arrowhead tip is visible
+          // Adjust endpoint so arrowhead tip touches the border (not the base)
           const dx = endX - startX
           const dy = endY - startY
           const dist = Math.sqrt(dx * dx + dy * dy) || 1
-          endX -= (dx / dist) * arrowHeadOffset
-          endY -= (dy / dist) * arrowHeadOffset
+          endX -= (dx / dist) * arrowheadTipSize
+          endY -= (dy / dist) * arrowheadTipSize
 
           // Control points for smooth S-curve that converges at the meeting point
           const controlY1 = startY + dy * 0.5
-          const controlY2 = meetingY - 40 // Pull control point up slightly for smooth convergence
+          const controlY2 = endY - 40 // Pull control point up slightly for smooth convergence
 
           connections.push(
             <path

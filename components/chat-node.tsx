@@ -59,6 +59,99 @@ export function ChatNode({
   const nodeWidth = node.size?.width || 400
   const nodeHeight = node.size?.height || 500
 
+  // Function to strip HTML/XML tags from text
+  const stripTags = (text: string): string => {
+    return text.replace(/<[^>]*>/g, '')
+  }
+
+  // Function to parse inline markdown (bold, italic, code)
+  const parseInlineMarkdown = (text: string): React.ReactNode => {
+    const parts: (string | React.ReactElement)[] = []
+    let lastIndex = 0
+    let keyCounter = 0
+    
+    // Match **bold** (must be double asterisks, not single)
+    const markdownRegex = /(\*\*([^*]+)\*\*|\*([^*\n]+)\*|`([^`]+)`)/g
+    let match
+    
+    while ((match = markdownRegex.exec(text)) !== null) {
+      // Add text before the match
+      if (match.index > lastIndex) {
+        const beforeText = text.slice(lastIndex, match.index)
+        if (beforeText) {
+          parts.push(beforeText)
+        }
+      }
+      
+      // Add the formatted text
+      if (match[1].startsWith('**')) {
+        // Bold text
+        parts.push(<strong key={`md-${keyCounter++}`}>{match[2]}</strong>)
+      } else if (match[1].startsWith('*') && !match[1].startsWith('**')) {
+        // Italic text (single asterisk, not double)
+        parts.push(<em key={`md-${keyCounter++}`}>{match[3]}</em>)
+      } else if (match[1].startsWith('`')) {
+        // Code text
+        parts.push(<code key={`md-${keyCounter++}`} className="bg-white/10 px-1 rounded text-xs font-mono">{match[4]}</code>)
+      }
+      
+      lastIndex = match.index + match[0].length
+    }
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      const remainingText = text.slice(lastIndex)
+      if (remainingText) {
+        parts.push(remainingText)
+      }
+    }
+    
+    return parts.length > 0 ? <>{parts}</> : text
+  }
+
+  // Function to parse markdown and return JSX elements
+  const parseMarkdown = (text: string): React.ReactNode => {
+    // First strip HTML tags
+    const cleanedText = stripTags(text)
+    
+    // Split by lines to handle headers
+    const lines = cleanedText.split('\n')
+    const elements: React.ReactNode[] = []
+    let keyCounter = 0
+    
+    lines.forEach((line, lineIndex) => {
+      // Check for headers (#, ##, ###, etc.)
+      const headerMatch = line.match(/^(#{1,6})\s+(.+)$/)
+      
+      if (headerMatch) {
+        const headerLevel = headerMatch[1].length
+        const headerText = headerMatch[2]
+        
+        // Render header with appropriate size
+        const headerSize = headerLevel === 1 ? 'text-xl' : headerLevel === 2 ? 'text-lg' : 'text-base'
+        const headerWeight = 'font-semibold'
+        
+        elements.push(
+          <div key={`header-${keyCounter++}`} className={`${headerSize} ${headerWeight} mt-4 mb-2 first:mt-0`}>
+            {parseInlineMarkdown(headerText)}
+          </div>
+        )
+      } else if (line.trim()) {
+        // Regular line with inline markdown
+        elements.push(
+          <div key={`line-${keyCounter++}`} className={lineIndex > 0 ? 'mt-2' : ''}>
+            {parseInlineMarkdown(line)}
+          </div>
+        )
+      } else {
+        // Empty line for spacing
+        elements.push(<div key={`empty-${keyCounter++}`} className="h-2" />)
+      }
+    })
+    
+    return <>{elements}</>
+  }
+
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
       titleInputRef.current.focus()
@@ -112,6 +205,9 @@ export function ChatNode({
     setInput("")
 
     try {
+      const selectedModel = node.model || 'sonar'
+      console.log('Sending request with model:', selectedModel, 'for node:', node.id)
+      
       const response = await fetch('/api/perplexity', {
         method: 'POST',
         headers: {
@@ -119,7 +215,7 @@ export function ChatNode({
         },
         body: JSON.stringify({
           messages: updatedMessages,
-          model: node.model || 'sonar',
+          model: selectedModel,
         }),
       })
 
@@ -128,7 +224,10 @@ export function ChatNode({
       }
 
       const data = await response.json()
-      const aiResponse = data.response || 'No response generated'
+      let aiResponse = data.response || 'No response generated'
+      
+      // Strip HTML/XML tags from the response
+      aiResponse = stripTags(aiResponse)
       
       // Add AI response to conversation
       const finalMessages = [...updatedMessages, { role: 'assistant' as const, content: aiResponse }]
@@ -421,13 +520,13 @@ export function ChatNode({
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`px-4 py-2 rounded-xl max-w-[80%] text-sm break-words ${
+                className={`px-4 py-2 rounded-xl max-w-[80%] text-sm break-words whitespace-pre-wrap leading-relaxed ${
                   message.role === 'user'
                     ? 'bg-[#20b8cd] text-black'
                     : 'bg-white/5 text-white'
                 }`}
               >
-                {message.content}
+                {message.role === 'assistant' ? parseMarkdown(message.content) : message.content}
               </div>
             </div>
           ))}
@@ -447,14 +546,14 @@ export function ChatNode({
           {/* Backward compatibility: show old userMessage/aiResponse if messages array doesn't exist */}
           {(!node.messages || node.messages.length === 0) && node.userMessage && (
             <div className="flex justify-end">
-              <div className="bg-[#20b8cd] text-black px-4 py-2 rounded-xl max-w-[80%] text-sm break-words">
+              <div className="bg-[#20b8cd] text-black px-4 py-2 rounded-xl max-w-[80%] text-sm break-words whitespace-pre-wrap leading-relaxed">
                 {node.userMessage}
               </div>
             </div>
           )}
           {(!node.messages || node.messages.length === 0) && node.aiResponse && !node.isLoading && (
-            <div className="bg-white/5 text-white px-4 py-3 rounded-xl text-sm leading-relaxed break-words">
-              {node.aiResponse}
+            <div className="bg-white/5 text-white px-4 py-3 rounded-xl text-sm leading-relaxed break-words whitespace-pre-wrap">
+              {parseMarkdown(node.aiResponse)}
             </div>
           )}
         </div>
