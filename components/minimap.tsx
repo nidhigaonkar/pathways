@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import type { ChatNodeType } from "@/lib/types"
 
 interface MinimapProps {
@@ -10,6 +11,21 @@ interface MinimapProps {
 
 export function Minimap({ nodes, pan, zoom }: MinimapProps) {
   const scale = 0.1 // Minimap scale factor
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    // Only access window on client side
+    const updateDimensions = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      })
+    }
+
+    updateDimensions()
+    window.addEventListener("resize", updateDimensions)
+    return () => window.removeEventListener("resize", updateDimensions)
+  }, [])
 
   return (
     <div className="absolute bottom-6 right-6 w-48 h-36 bg-[#1a1b1b] border border-white/20 rounded-lg overflow-hidden">
@@ -21,8 +37,8 @@ export function Minimap({ nodes, pan, zoom }: MinimapProps) {
           style={{
             left: `${-pan.x * scale}px`,
             top: `${-pan.y * scale}px`,
-            width: `${(window.innerWidth / zoom) * scale}px`,
-            height: `${(window.innerHeight / zoom) * scale}px`,
+            width: `${(dimensions.width / zoom) * scale}px`,
+            height: `${(dimensions.height / zoom) * scale}px`,
             opacity: 0.5,
           }}
         />

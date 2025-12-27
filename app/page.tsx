@@ -26,7 +26,7 @@ export default function InfiniteCanvasPage() {
       expanded: true,
       isActive: false,
       isLoading: false,
-      model: "gpt4",
+      model: "sonar",
       usageType: "focus",
       size: { width: 400, height: 500 },
       title: "AI Future Discussion",
@@ -101,7 +101,7 @@ export default function InfiniteCanvasPage() {
         expanded: true,
         isActive: true,
         isLoading: false,
-        model: "gpt4",
+        model: "sonar",
         usageType: "focus",
         size: { width: 400, height: 500 },
       }
@@ -117,21 +117,23 @@ export default function InfiniteCanvasPage() {
 
       const parentWidth = parent.size?.width || 400
       const parentHeight = parent.size?.height || 500
-      const spacing = 100 // Additional spacing between nodes
+      const nodeWidth = parent.size?.width || 400
+      const nodeHeight = parent.size?.height || 500
+      const gap = 120 // extra gap so arrowheads stay visible
 
       const offsets = {
-        top: { x: 0, y: -(parentHeight / 2 + 250 + spacing) },
-        right: { x: parentWidth / 2 + 200 + spacing, y: 0 },
-        bottom: { x: 0, y: parentHeight / 2 + 250 + spacing },
-        left: { x: -(parentWidth / 2 + 200 + spacing), y: 0 },
+        top: { x: -nodeWidth / 2 + parentWidth / 2, y: -(nodeHeight + gap) },
+        right: { x: parentWidth + gap, y: -nodeHeight / 2 + parentHeight / 2 },
+        bottom: { x: -nodeWidth / 2 + parentWidth / 2, y: parentHeight + gap },
+        left: { x: -(nodeWidth + gap), y: -nodeHeight / 2 + parentHeight / 2 },
       }
 
       const offset = offsets[direction]
       const newNode: ChatNodeType = {
         id: Date.now().toString(),
         position: {
-          x: parent.position.x + parentWidth / 2 + offset.x - 200, // Center-align the new node
-          y: parent.position.y + parentHeight / 2 + offset.y - 250, // Center-align the new node
+          x: parent.position.x + offset.x,
+          y: parent.position.y + offset.y,
         },
         userMessage: "",
         aiResponse: "",
@@ -141,7 +143,7 @@ export default function InfiniteCanvasPage() {
         expanded: true,
         isActive: false, // Don't auto-activate new nodes
         isLoading: false,
-        model: parent.model || "gpt4",
+        model: parent.model || "sonar",
         usageType: parent.usageType || "focus",
         size: { width: 400, height: 500 },
       }
@@ -159,7 +161,10 @@ export default function InfiniteCanvasPage() {
 
       const newNode: ChatNodeType = {
         id: Date.now().toString(),
-        position: { x: parent.position.x + 500, y: parent.position.y + 200 },
+        position: {
+          x: parent.position.x + (parent.size?.width || 400) + 160, // gap so arrowhead is visible
+          y: parent.position.y + (parent.size?.height || 500) / 2 - 250,
+        },
         userMessage: "",
         aiResponse: "",
         parentId,
@@ -168,7 +173,7 @@ export default function InfiniteCanvasPage() {
         expanded: true,
         isActive: false, // Don't auto-activate new nodes
         isLoading: false,
-        model: parent.model || "gpt4",
+        model: parent.model || "sonar",
         usageType: parent.usageType || "focus",
         size: { width: 400, height: 500 }, // Added size property
       }
@@ -220,63 +225,99 @@ export default function InfiniteCanvasPage() {
       const nodeCenterX = node.position.x + nodeWidth / 2
       const nodeCenterY = node.position.y + nodeHeight / 2
 
+      const arrowHeadOffset = 50
+
       if (parentIds.length === 1) {
         const parent = nodes.find((n) => n.id === parentIds[0])
         if (!parent) return
 
         const parentWidth = parent.size?.width || 400
         const parentHeight = parent.size?.height || 500
+        const parentCenterX = parent.position.x + parentWidth / 2
+        const parentCenterY = parent.position.y + parentHeight / 2
 
-        let startX = parent.position.x + parentWidth / 2
-        let startY = parent.position.y + parentHeight / 2
+        const padding = 50
 
-        if (node.connectionDirection === "top") {
-          startX = parent.position.x + parentWidth / 2
-          startY = parent.position.y
-        } else if (node.connectionDirection === "right") {
-          startX = parent.position.x + parentWidth
-          startY = parent.position.y + parentHeight / 2
-        } else if (node.connectionDirection === "bottom") {
-          startX = parent.position.x + parentWidth / 2
-          startY = parent.position.y + parentHeight
-        } else if (node.connectionDirection === "left") {
-          startX = parent.position.x
-          startY = parent.position.y + parentHeight / 2
-        }
+        // Calculate the difference between centers
+        const dx = nodeCenterX - parentCenterX
+        const dy = nodeCenterY - parentCenterY
 
-        const dx = nodeCenterX - startX
-        const dy = nodeCenterY - startY
-        const angle = Math.atan2(dy, dx)
+        // Determine which edges to connect based on relative positions
+        let startX, startY, endX, endY
 
-        const padding = 15
-        let endX = nodeCenterX
-        let endY = nodeCenterY
+        // Calculate if nodes overlap in x or y axis
+        const parentLeft = parent.position.x
+        const parentRight = parent.position.x + parentWidth
+        const parentTop = parent.position.y
+        const parentBottom = parent.position.y + parentHeight
+        
+        const nodeLeft = node.position.x
+        const nodeRight = node.position.x + nodeWidth
+        const nodeTop = node.position.y
+        const nodeBottom = node.position.y + nodeHeight
 
-        const absAngle = Math.abs(angle)
-        const halfWidth = nodeWidth / 2
-        const halfHeight = nodeHeight / 2
+        // Check horizontal and vertical alignment
+        const horizontalOverlap = !(nodeRight < parentLeft || nodeLeft > parentRight)
+        const verticalOverlap = !(nodeBottom < parentTop || nodeTop > parentBottom)
 
-        if (absAngle < Math.atan(halfHeight / halfWidth)) {
-          endX = node.position.x + nodeWidth - padding
-          endY = nodeCenterY + (endX - nodeCenterX) * Math.tan(angle)
-        } else if (absAngle > Math.PI - Math.atan(halfHeight / halfWidth)) {
-          endX = node.position.x + padding
-          endY = nodeCenterY + (endX - nodeCenterX) * Math.tan(angle)
-        } else if (angle > 0) {
-          endY = node.position.y + nodeHeight - padding
-          endX = nodeCenterX + (endY - nodeCenterY) / Math.tan(angle)
+        if (Math.abs(dy) > Math.abs(dx) || horizontalOverlap) {
+          // Primarily vertical connection
+          if (dy > 0) {
+            // Child is below parent - connect parent bottom to child top
+            startX = parentCenterX
+            startY = parentBottom
+            endX = nodeCenterX
+            endY = nodeTop + padding
+          } else {
+            // Child is above parent - connect parent top to child bottom
+            startX = parentCenterX
+            startY = parentTop
+            endX = nodeCenterX
+            endY = nodeBottom - padding
+          }
         } else {
-          endY = node.position.y + padding
-          endX = nodeCenterX + (endY - nodeCenterY) / Math.tan(angle)
+          // Primarily horizontal connection
+          if (dx > 0) {
+            // Child is to the right of parent - connect parent right to child left
+            startX = parentRight
+            startY = parentCenterY
+            endX = nodeLeft + padding
+            endY = nodeCenterY
+          } else {
+            // Child is to the left of parent - connect parent left to child right
+            startX = parentLeft
+            startY = parentCenterY
+            endX = nodeRight - padding
+            endY = nodeCenterY
+          }
         }
 
+        // Pull the end point back slightly so the arrowhead tip is visible
+        const endDx = endX - startX
+        const endDy = endY - startY
+        const endDist = Math.sqrt(endDx * endDx + endDy * endDy) || 1
+        endX -= (endDx / endDist) * arrowHeadOffset
+        endY -= (endDy / endDist) * arrowHeadOffset
+
+        // Create smooth bezier curve
         const distance = Math.sqrt(dx * dx + dy * dy)
         const curvature = Math.min(distance * 0.3, 100)
 
-        const controlX1 = startX + dx * 0.5
-        const controlY1 = startY - curvature
-        const controlX2 = startX + dx * 0.5
-        const controlY2 = endY + curvature
+        let controlX1, controlY1, controlX2, controlY2
+
+        if (Math.abs(dy) > Math.abs(dx) || horizontalOverlap) {
+          // Vertical curve
+          controlX1 = startX
+          controlY1 = startY + (endY - startY) * 0.5
+          controlX2 = endX
+          controlY2 = endY - (endY - startY) * 0.5
+        } else {
+          // Horizontal curve
+          controlX1 = startX + (endX - startX) * 0.5
+          controlY1 = startY
+          controlX2 = endX - (endX - startX) * 0.5
+          controlY2 = endY
+        }
 
         connections.push(
           <g key={`${node.id}-${parentIds[0]}`}>
@@ -293,7 +334,7 @@ export default function InfiniteCanvasPage() {
       } else {
         // Calculate the meeting point at the top edge of the merged node
         const meetingX = nodeCenterX
-        const meetingY = node.position.y + 15 // Top edge with padding
+        const meetingY = node.position.y + 50 // Top edge with padding
 
         parentIds.forEach((parentId) => {
           const parent = nodes.find((n) => n.id === parentId)
@@ -305,8 +346,15 @@ export default function InfiniteCanvasPage() {
           const startY = parent.position.y + parentHeight
 
           // Create smooth bezier curve from parent bottom directly to meeting point
-          const dx = meetingX - startX
-          const dy = meetingY - startY
+          let endX = meetingX
+          let endY = meetingY
+
+          // Pull the end point back slightly so the arrowhead tip is visible
+          const dx = endX - startX
+          const dy = endY - startY
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1
+          endX -= (dx / dist) * arrowHeadOffset
+          endY -= (dy / dist) * arrowHeadOffset
 
           // Control points for smooth S-curve that converges at the meeting point
           const controlY1 = startY + dy * 0.5
@@ -315,7 +363,7 @@ export default function InfiniteCanvasPage() {
           connections.push(
             <path
               key={`${node.id}-${parentId}`}
-              d={`M ${startX} ${startY} C ${startX} ${controlY1}, ${meetingX} ${controlY2}, ${meetingX} ${meetingY}`}
+              d={`M ${startX} ${startY} C ${startX} ${controlY1}, ${endX} ${controlY2}, ${endX} ${endY}`}
               stroke="#20b8cd"
               strokeWidth="2"
               fill="none"
@@ -350,7 +398,7 @@ export default function InfiniteCanvasPage() {
             id: Date.now().toString(),
             position: {
               x: centerX,
-              y: maxY + 150, // Position below with spacing
+              y: maxY + 220, // Extra spacing so arrowheads stay visible
             },
             userMessage: `${sourceNode.userMessage}\n\n${targetNode.userMessage}`,
             aiResponse: `Merged content:\n\n${sourceNode.aiResponse}\n\n${targetNode.aiResponse}`,
@@ -360,7 +408,7 @@ export default function InfiniteCanvasPage() {
             expanded: true,
             isActive: false, // Don't auto-activate merged nodes
             isLoading: false,
-            model: sourceNode.model || "gpt4",
+            model: sourceNode.model || "sonar",
             usageType: sourceNode.usageType || "focus",
             size: { width: 400, height: 500 },
             title: `${sourceNode.title || "Node " + sourceNode.id} + ${targetNode.title || "Node " + targetNode.id}`,
@@ -453,7 +501,7 @@ export default function InfiniteCanvasPage() {
 
         {/* SVG for connection lines */}
         <svg
-          className="absolute inset-0 pointer-events-none w-full h-full"
+          className="absolute inset-0 pointer-events-none w-full h-full z-20"
           style={{
             width: "100%",
             height: "100%",
@@ -484,7 +532,7 @@ export default function InfiniteCanvasPage() {
 
         {/* Chat nodes */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 z-10"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "0 0",

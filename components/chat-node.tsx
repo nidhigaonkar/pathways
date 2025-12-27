@@ -353,29 +353,16 @@ export function ChatNode({
           </div>
         </div>
 
-        <div className="px-3 py-2 border-b border-white/10 flex gap-2">
-          <Select value={node.usageType || "focus"} onValueChange={(value) => onUpdate(node.id, { usageType: value })}>
+        <div className="px-3 py-2 border-b border-white/10">
+          <Select value={node.model || "sonar"} onValueChange={(value) => onUpdate(node.id, { model: value })}>
             <SelectTrigger className="h-8 text-xs bg-white/5 border-white/20 text-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="focus">Focus</SelectItem>
-              <SelectItem value="research">Research</SelectItem>
-              <SelectItem value="learn">Learn</SelectItem>
-              <SelectItem value="finance">Finance</SelectItem>
-              <SelectItem value="code">Code</SelectItem>
-              <SelectItem value="video">Video</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={node.model || "gpt4"} onValueChange={(value) => onUpdate(node.id, { model: value })}>
-            <SelectTrigger className="h-8 text-xs bg-white/5 border-white/20 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="gpt4">GPT-4</SelectItem>
-              <SelectItem value="claude">Claude</SelectItem>
-              <SelectItem value="gemini">Gemini</SelectItem>
+              <SelectItem value="sonar">Sonar</SelectItem>
+              <SelectItem value="sonar-pro">Sonar Pro</SelectItem>
+              <SelectItem value="sonar-reasoning-pro">Sonar Reasoning Pro</SelectItem>
+              <SelectItem value="sonar-deep-research">Sonar Deep Research</SelectItem>
             </SelectContent>
           </Select>
         </div>
