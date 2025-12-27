@@ -1,4 +1,4 @@
-# Infinite canvas chat
+# Infinite canvas chat with Perplexity API
 
 *Automatically synced with your [v0.app](https://v0.app) deployments*
 
@@ -16,15 +16,4 @@ Your project is live at:
 
 **[https://vercel.com/nidhi-4345s-projects/v0-infinite-canvas-chat](https://vercel.com/nidhi-4345s-projects/v0-infinite-canvas-chat)**
 
-## Build your app
 
-Continue building your app on:
-
-**[https://v0.app/chat/gqRbXN6ZNAv](https://v0.app/chat/gqRbXN6ZNAv)**
-
-## How It Works
-
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
