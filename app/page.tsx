@@ -1,15 +1,13 @@
 "use client"
 
 import type React from "react"
-import type JSX from "jsx" // Declare the JSX variable before using it
-
 import { useState, useRef, useCallback } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ChatNode } from "@/components/chat-node"
 import { CanvasNavbar } from "@/components/canvas-navbar"
 import { Minimap } from "@/components/minimap"
-import { Sparkles } from "lucide-react"
+import { Sparkles, GitMerge } from "lucide-react"
 import type { ChatNodeType } from "@/lib/types"
 
 export default function InfiniteCanvasPage() {
@@ -32,7 +30,7 @@ export default function InfiniteCanvasPage() {
       aiResponse:
         "The future of AI is incredibly exciting and transformative. We're moving towards more sophisticated systems that can understand context, reason across domains, and collaborate with humans in meaningful ways. Key trends include multimodal AI, improved reasoning capabilities, and more efficient models.",
       parentId: null,
-      parentIds: null, // Updated to handle multiple parents
+      parentIds: undefined, // Updated to handle multiple parents
       connectionDirection: null,
       expanded: true,
       isActive: false,
@@ -40,7 +38,7 @@ export default function InfiniteCanvasPage() {
       model: "sonar",
       usageType: "focus",
       size: { width: 400, height: 500 },
-      title: "AI Future Discussion",
+      title: "EX: AI Future Discussion",
     },
   ])
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
@@ -52,6 +50,8 @@ export default function InfiniteCanvasPage() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const canvasRef = useRef<HTMLDivElement>(null)
   const [searchQuery, setSearchQuery] = useState("") // Added search state
+  const [batchQuery, setBatchQuery] = useState("") // Query for running multiple nodes
+  const [showBatchInput, setShowBatchInput] = useState(false) // Show batch input UI
 
   // Handle canvas panning
   const handleMouseDown = useCallback(
@@ -108,7 +108,7 @@ export default function InfiniteCanvasPage() {
         userMessage: "",
         aiResponse: "",
         parentId: null,
-        parentIds: null,
+        parentIds: undefined,
         connectionDirection: null,
         expanded: true,
         isActive: true,
@@ -151,7 +151,7 @@ export default function InfiniteCanvasPage() {
         userMessage: "",
         aiResponse: "",
         parentId,
-        parentIds: null, // Updated to handle multiple parents
+        parentIds: undefined, // Updated to handle multiple parents
         connectionDirection: direction,
         expanded: true,
         isActive: false, // Don't auto-activate new nodes
@@ -182,7 +182,7 @@ export default function InfiniteCanvasPage() {
         userMessage: "",
         aiResponse: "",
         parentId,
-        parentIds: null, // Updated to handle multiple parents
+        parentIds: undefined, // Updated to handle multiple parents
         connectionDirection: "right",
         expanded: true,
         isActive: false, // Don't auto-activate new nodes
@@ -226,8 +226,109 @@ export default function InfiniteCanvasPage() {
     setSelectedNodes((prev) => (prev.includes(nodeId) ? prev.filter((id) => id !== nodeId) : [...prev, nodeId]))
   }, [])
 
+  // Handler to run a node's query
+  const handleRunNode = useCallback(
+    async (nodeId: string, userMessage: string) => {
+      const node = nodes.find((n) => n.id === nodeId)
+      if (!node) return
+
+      // Get current messages or initialize empty array
+      const currentMessages = node.messages || []
+
+      // Add user message to conversation
+      const updatedMessages = [...currentMessages, { role: "user" as const, content: userMessage }]
+
+      setNodes((prevNodes) =>
+        prevNodes.map((n) =>
+          n.id === nodeId
+            ? {
+                ...n,
+                messages: updatedMessages,
+                isLoading: true,
+              }
+            : n,
+        ),
+      )
+
+      try {
+        const selectedModel = node.model || "sonar"
+        console.log("Sending request with model:", selectedModel, "for node:", node.id)
+
+        const response = await fetch("/api/perplexity", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: updatedMessages,
+            model: selectedModel,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`API request failed: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        const aiResponse = data.response || "No response generated"
+
+        // Add AI response to conversation
+        const finalMessages = [...updatedMessages, { role: "assistant" as const, content: aiResponse }]
+
+        setNodes((prevNodes) =>
+          prevNodes.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  messages: finalMessages,
+                  isLoading: false,
+                }
+              : n,
+          ),
+        )
+      } catch (error) {
+        console.error("Error calling Perplexity API:", error)
+        // Add error message to conversation
+        const errorMessages = [
+          ...updatedMessages,
+          {
+            role: "assistant" as const,
+            content: "Sorry, there was an error generating a response. Please try again.",
+          },
+        ]
+
+        setNodes((prevNodes) =>
+          prevNodes.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  messages: errorMessages,
+                  isLoading: false,
+                }
+              : n,
+          ),
+        )
+      }
+    },
+    [nodes],
+  )
+
+  // Handler to run multiple selected nodes in parallel
+  const handleRunSelectedNodes = useCallback(
+    async (query: string) => {
+      if (!query.trim() || selectedNodes.length === 0) return
+
+      // Run all selected nodes in parallel
+      const runPromises = selectedNodes.map((nodeId) => handleRunNode(nodeId, query.trim()))
+
+      await Promise.all(runPromises)
+      console.log(`Executed ${selectedNodes.length} nodes in parallel`)
+    },
+    [selectedNodes, handleRunNode],
+  )
+
   const renderConnections = () => {
-    const connections: JSX.Element[] = []
+    const connections: React.JSX.Element[] = []
 
     nodes.forEach((node) => {
       const parentIds = node.parentIds || (node.parentId ? [node.parentId] : [])
@@ -355,6 +456,10 @@ export default function InfiniteCanvasPage() {
         const meetingX = nodeCenterX
         const meetingY = node.position.y // Top edge - no padding, arrow will touch border
         const arrowheadTipSize = 18 // Size of arrowhead tip from marker (refX="9" * strokeWidth="2")
+        const convergenceOffset = 60 // How far above the node the lines should converge
+
+        const convergenceX = meetingX
+        const convergenceY = meetingY - convergenceOffset
 
         parentIds.forEach((parentId) => {
           const parent = nodes.find((n) => n.id === parentId)
@@ -365,33 +470,36 @@ export default function InfiniteCanvasPage() {
           const startX = parent.position.x + parentWidth / 2
           const startY = parent.position.y + parentHeight
 
-          // Create smooth bezier curve from parent bottom directly to meeting point
-          let endX = meetingX
-          let endY = meetingY
-
-          // Adjust endpoint so arrowhead tip touches the border (not the base)
-          const dx = endX - startX
-          const dy = endY - startY
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1
-          endX -= (dx / dist) * arrowheadTipSize
-          endY -= (dy / dist) * arrowheadTipSize
-
-          // Control points for smooth S-curve that converges at the meeting point
-          const controlY1 = startY + dy * 0.5
-          const controlY2 = endY - 40 // Pull control point up slightly for smooth convergence
+          // Create smooth curve from parent bottom to convergence point
+          // We use control points to ensure it starts vertically from parent and ends vertically at convergence point
+          const controlY1 = startY + (convergenceY - startY) * 0.5
+          const controlY2 = convergenceY - 20
 
           connections.push(
             <path
-              key={`${node.id}-${parentId}`}
-              d={`M ${startX} ${startY} C ${startX} ${controlY1}, ${endX} ${controlY2}, ${endX} ${endY}`}
+              key={`${node.id}-${parentId}-blend`}
+              d={`M ${startX} ${startY} C ${startX} ${controlY1}, ${convergenceX} ${controlY2}, ${convergenceX} ${convergenceY}`}
               stroke="#20b8cd"
               strokeWidth="2"
               fill="none"
               opacity="0.6"
-              markerEnd="url(#arrowhead)"
             />,
           )
         })
+
+        // Draw the final single stem from convergence point to the node
+        const endY = meetingY - arrowheadTipSize
+        connections.push(
+          <path
+            key={`${node.id}-final-stem`}
+            d={`M ${convergenceX} ${convergenceY} L ${convergenceX} ${endY}`}
+            stroke="#20b8cd"
+            strokeWidth="2"
+            fill="none"
+            opacity="0.6"
+            markerEnd="url(#arrowhead)"
+          />,
+        )
       }
     })
 
@@ -399,7 +507,7 @@ export default function InfiniteCanvasPage() {
   }
 
   const handleStartMerge = useCallback(
-    (nodeId: string) => {
+    async (nodeId: string) => {
       if (!isMergeMode) {
         setIsMergeMode(true)
         setMergeSourceId(nodeId)
@@ -414,38 +522,126 @@ export default function InfiniteCanvasPage() {
             sourceNode.position.y + (sourceNode.size?.height || 500),
             targetNode.position.y + (targetNode.size?.height || 500),
           )
-          // Merge messages from both source nodes
-          const mergedMessages = [
-            ...(sourceNode.messages || []),
-            ...(targetNode.messages || []),
-          ]
-          
-          const mergedNode: ChatNodeType = {
-            id: Date.now().toString(),
+
+          // Create a temporary merged node that shows loading state
+          const tempNodeId = Date.now().toString()
+          const tempMergedNode: ChatNodeType = {
+            id: tempNodeId,
             position: {
               x: centerX,
               y: maxY + 220, // Extra spacing so arrowheads stay visible
             },
-            messages: mergedMessages,
-            userMessage: `${sourceNode.userMessage}\n\n${targetNode.userMessage}`, // Backward compatibility
-            aiResponse: `Merged content:\n\n${sourceNode.aiResponse}\n\n${targetNode.aiResponse}`, // Backward compatibility
+            messages: [],
+            userMessage: "",
+            aiResponse: "",
             parentId: null,
             parentIds: [sourceNode.id, targetNode.id], // Track both parents
             connectionDirection: null,
             expanded: true,
-            isActive: false, // Don't auto-activate merged nodes
-            isLoading: false,
+            isActive: false,
+            isLoading: true, // Show loading state
             model: sourceNode.model || "sonar",
             usageType: sourceNode.usageType || "focus",
             size: { width: 400, height: 500 },
             title: `${sourceNode.title || "Node " + sourceNode.id} + ${targetNode.title || "Node " + targetNode.id}`,
           }
 
-          setNodes([...nodes, mergedNode])
-        }
+          setNodes([...nodes, tempMergedNode])
+          setIsMergeMode(false)
+          setMergeSourceId(null)
 
-        setIsMergeMode(false)
-        setMergeSourceId(null)
+          // Generate summary of both chat histories
+          try {
+            // Format the chat histories for summarization
+            const sourceHistory =
+              sourceNode.messages.length > 0
+                ? sourceNode.messages.map((m) => `${m.role}: ${m.content}`).join("\n")
+                : `User: ${sourceNode.userMessage}\nAssistant: ${sourceNode.aiResponse}`
+
+            const targetHistory =
+              targetNode.messages.length > 0
+                ? targetNode.messages.map((m) => `${m.role}: ${m.content}`).join("\n")
+                : `User: ${targetNode.userMessage}\nAssistant: ${targetNode.aiResponse}`
+
+            // Create a prompt to summarize both conversations
+            const summaryPrompt = `I have two separate conversation threads that I want to merge. Please provide a comprehensive summary of both conversations, highlighting key topics, insights, and any connections between them.
+
+**Conversation 1 (from ${sourceNode.title || "Node " + sourceNode.id}):**
+${sourceHistory}
+
+**Conversation 2 (from ${targetNode.title || "Node " + targetNode.id}):**
+${targetHistory}
+
+IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, concise summary that captures the essence of both conversations and can serve as context for continuing this merged discussion.`
+
+            // Call the API to generate summary
+            const response = await fetch("/api/perplexity", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                messages: [
+                  {
+                    role: "user",
+                    content: summaryPrompt,
+                  },
+                ],
+                model: sourceNode.model || "sonar",
+              }),
+            })
+
+            if (!response.ok) {
+              throw new Error("Failed to generate summary")
+            }
+
+            const data = await response.json()
+            const summary = data.response
+
+            // Create the final merged node with summary as context
+            const mergedMessages = [
+              {
+                role: "assistant" as const,
+                content: `**Summary of Merged Conversations:**\n\n${summary}`,
+              },
+            ]
+
+            // Update the node with the summary
+            setNodes((prevNodes) =>
+              prevNodes.map((n) =>
+                n.id === tempNodeId
+                  ? {
+                      ...n,
+                      messages: mergedMessages,
+                      userMessage: "", // Clear temporary values
+                      aiResponse: summary,
+                      isLoading: false,
+                    }
+                  : n,
+              ),
+            )
+          } catch (error) {
+            console.error("Error generating merge summary:", error)
+            // Update node with error state
+            setNodes((prevNodes) =>
+              prevNodes.map((n) =>
+                n.id === tempNodeId
+                  ? {
+                      ...n,
+                      messages: [
+                        {
+                          role: "assistant" as const,
+                          content: "Failed to generate summary. Please try again.",
+                        },
+                      ],
+                      aiResponse: "Failed to generate summary.",
+                      isLoading: false,
+                    }
+                  : n,
+              ),
+            )
+          }
+        }
       } else {
         // Cancel merge
         setIsMergeMode(false)
@@ -583,6 +779,7 @@ export default function InfiniteCanvasPage() {
                   onToggleSelect={handleToggleSelect}
                   onCreateDirectional={handleCreateDirectional}
                   onStartMerge={handleStartMerge}
+                  onRunNode={handleRunNode}
                   isMergeMode={isMergeMode}
                   mergeSourceId={mergeSourceId}
                   pan={pan}
@@ -621,16 +818,82 @@ export default function InfiniteCanvasPage() {
           </div>
         )}
 
-        {selectedNodes.length >= 2 && !isMergeMode && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-            <Button
-              className="bg-[#20b8cd] hover:bg-[#1a9db0] text-black font-medium shadow-lg"
-              onClick={() => {
-                console.log("Merging nodes:", selectedNodes)
-              }}
-            >
-              Merge {selectedNodes.length} Nodes
-            </Button>
+        {selectedNodes.length >= 1 && !isMergeMode && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
+            {showBatchInput ? (
+              <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 shadow-2xl border border-white/10 min-w-[400px]">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="text"
+                      value={batchQuery}
+                      onChange={(e) => setBatchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          handleRunSelectedNodes(batchQuery)
+                          setBatchQuery("")
+                          setShowBatchInput(false)
+                        }
+                        if (e.key === "Escape") {
+                          setShowBatchInput(false)
+                          setBatchQuery("")
+                        }
+                      }}
+                      placeholder="Enter query to run on all selected nodes..."
+                      className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#20b8cd]"
+                      autoFocus
+                    />
+                    <Button
+                      className="bg-[#20b8cd] hover:bg-[#1a9db0] text-black font-medium"
+                      onClick={() => {
+                        handleRunSelectedNodes(batchQuery)
+                        setBatchQuery("")
+                        setShowBatchInput(false)
+                      }}
+                      disabled={!batchQuery.trim()}
+                    >
+                      Run
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-white/20 text-white hover:bg-white/10"
+                      onClick={() => {
+                        setShowBatchInput(false)
+                        setBatchQuery("")
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <div className="text-xs text-white/60">
+                    This query will be sent to {selectedNodes.length} node{selectedNodes.length > 1 ? "s" : ""} in
+                    parallel
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  className="bg-[#20b8cd] hover:bg-[#1a9db0] text-black font-medium shadow-lg"
+                  onClick={() => setShowBatchInput(true)}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Run {selectedNodes.length} Node{selectedNodes.length > 1 ? "s" : ""}
+                </Button>
+                {selectedNodes.length >= 2 && (
+                  <Button
+                    className="bg-purple-500 hover:bg-purple-600 text-white font-medium shadow-lg"
+                    onClick={() => {
+                      console.log("Merging nodes:", selectedNodes)
+                    }}
+                  >
+                    <GitMerge className="h-4 w-4 mr-2" />
+                    Merge {selectedNodes.length} Nodes
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
