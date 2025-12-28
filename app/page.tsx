@@ -87,7 +87,7 @@ export default function InfiniteCanvasPage() {
     (e: React.WheelEvent) => {
       e.preventDefault()
       const delta = e.deltaY * -0.001
-      const newZoom = Math.min(Math.max(0.5, zoom + delta), 2)
+      const newZoom = Math.min(Math.max(0.01, zoom + delta), 2)
       setZoom(newZoom)
     },
     [zoom],
@@ -682,7 +682,7 @@ IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, conci
     // Calculate zoom to fit
     const zoomX = viewportWidth / contentWidth
     const zoomY = viewportHeight / contentHeight
-    const newZoom = Math.min(Math.max(zoomX, zoomY) * 0.9, 1) // 0.9 for some breathing room, max 1x
+    const newZoom = Math.min(Math.max(Math.min(zoomX, zoomY) * 0.9, 0.01), 1) // 0.9 for some breathing room, max 1x, min 0.01x
 
     // Calculate pan to center the content
     const contentCenterX = (minX + maxX) / 2
