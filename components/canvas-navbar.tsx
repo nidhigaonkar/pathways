@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search, User, X, Maximize2 } from "lucide-react"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 
 interface CanvasNavbarProps {
   searchQuery: string
@@ -13,6 +13,31 @@ interface CanvasNavbarProps {
 
 export function CanvasNavbar({ searchQuery, onSearchChange, onZoomToFit }: CanvasNavbarProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [showCreditsPopup, setShowCreditsPopup] = useState(false)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  // Close popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setShowCreditsPopup(false)
+      }
+    }
+
+    if (showCreditsPopup) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [showCreditsPopup])
 
   return (
     <nav className="h-[72px] bg-[#1a1b1b] border-b border-white/10 flex items-center justify-between px-6 relative z-50">
@@ -23,7 +48,7 @@ export function CanvasNavbar({ searchQuery, onSearchChange, onZoomToFit }: Canva
             Pathways
           </span>
           <span className="text-white text-[10px] font-light leading-tight">
-            powered by Perplexity
+            Infinite canvas chat - powered by Perplexity
           </span>
         </div>
       </div>
@@ -74,9 +99,38 @@ export function CanvasNavbar({ searchQuery, onSearchChange, onZoomToFit }: Canva
             <Maximize2 className="h-5 w-5" />
           </Button>
         )}
-        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
-          <User className="h-5 w-5" />
-        </Button>
+        <div className="relative">
+          <Button
+            ref={buttonRef}
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10"
+            onClick={() => setShowCreditsPopup(!showCreditsPopup)}
+          >
+            <User className="h-5 w-5" />
+          </Button>
+          {showCreditsPopup && (
+            <div
+              ref={popupRef}
+              className="absolute top-full right-0 mt-2 bg-[#1a1b1b] border border-white/20 rounded-lg px-3 py-2 shadow-lg z-50 min-w-[200px]"
+            >
+              <p className="text-white text-xs leading-relaxed">
+                Built by{" "}
+                <span className="font-semibold">Nidhi</span> at{" "}
+                <span className="font-semibold">UC Berkeley</span>!
+              </p>
+              <a
+                href="https://nidhig.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#20b8cd] hover:text-[#1a9db0] text-xs font-medium mt-1 inline-block transition-colors"
+                onClick={() => setShowCreditsPopup(false)}
+              >
+                → nidhig.dev
+              </a>
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   )
