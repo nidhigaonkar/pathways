@@ -54,9 +54,12 @@ export function ChatNode({
   const [isHovered, setIsHovered] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleInput, setTitleInput] = useState(node.title || `Node ${node.id}`)
+  const [isRecording, setIsRecording] = useState(false)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const nodeRef = useRef<HTMLDivElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const recognitionRef = useRef<any>(null)
+  const baseTextRef = useRef<string>("")
 
   const nodeWidth = node.size?.width || 400
   const nodeHeight = node.size?.height || 500
@@ -160,6 +163,66 @@ export function ChatNode({
       titleInputRef.current.select()
     }
   }, [isEditingTitle])
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition()
+        recognition.continuous = true
+        recognition.interimResults = true
+        recognition.lang = "en-US"
+
+        recognition.onresult = (event: any) => {
+          let interimTranscript = ""
+          let finalTranscript = ""
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + " "
+              // Update base text when we get final results
+              baseTextRef.current = baseTextRef.current + finalTranscript
+            } else {
+              interimTranscript += transcript
+            }
+          }
+
+          // Combine base text + final transcript + interim transcript
+          const newText = baseTextRef.current + finalTranscript + (interimTranscript ? ` ${interimTranscript}` : "")
+          setInput(newText)
+        }
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error)
+          setIsRecording(false)
+          if (event.error === "no-speech") {
+            // User stopped speaking, keep the text
+          } else if (event.error === "not-allowed") {
+            alert("Microphone permission denied. Please enable microphone access in your browser settings.")
+          }
+        }
+
+        recognition.onend = () => {
+          setIsRecording(false)
+          // baseTextRef is already updated by onresult when final transcripts are received
+        }
+
+        recognitionRef.current = recognition
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          // Ignore errors when stopping
+        }
+      }
+    }
+  }, [])
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button, textarea, input, select, .resize-handle")) return
@@ -586,8 +649,41 @@ export function ChatNode({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
-                onClick={(e) => e.stopPropagation()}
+                className={`h-8 w-8 ${
+                  isRecording
+                    ? "text-red-400 hover:text-red-300 bg-red-500/20 hover:bg-red-500/30 animate-pulse"
+                    : "text-white/60 hover:text-white hover:bg-white/10"
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!recognitionRef.current) {
+                    alert("Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.")
+                    return
+                  }
+
+                  if (isRecording) {
+                    // Stop recording
+                    try {
+                      recognitionRef.current.stop()
+                      setIsRecording(false)
+                    } catch (error) {
+                      console.error("Error stopping recognition:", error)
+                      setIsRecording(false)
+                    }
+                  } else {
+                    // Start recording
+                    try {
+                      // Store current input as base text before starting
+                      baseTextRef.current = input
+                      recognitionRef.current.start()
+                      setIsRecording(true)
+                    } catch (error) {
+                      console.error("Error starting recognition:", error)
+                      setIsRecording(false)
+                    }
+                  }
+                }}
+                title={isRecording ? "Stop recording" : "Start voice input"}
               >
                 <Mic className="h-4 w-4" />
               </Button>
