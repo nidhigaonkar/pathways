@@ -95,6 +95,12 @@ export default function InfiniteCanvasPage() {
 
   const handleCanvasDoubleClick = useCallback(
     (e: React.MouseEvent) => {
+      // Prevent node creation if clicking on navbar or its children
+      const target = e.target as HTMLElement
+      if (target.closest("nav") || target.closest('[role="navigation"]')) {
+        return
+      }
+
       const rect = canvasRef.current?.getBoundingClientRect()
       if (!rect) return
 
@@ -701,7 +707,9 @@ IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, conci
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#202222] flex flex-col">
-      <CanvasNavbar searchQuery={searchQuery} onSearchChange={setSearchQuery} onZoomToFit={handleZoomToFit} />
+      <div className="relative z-50">
+        <CanvasNavbar searchQuery={searchQuery} onSearchChange={setSearchQuery} onZoomToFit={handleZoomToFit} />
+      </div>
       <div
         ref={canvasRef}
         className="flex-1 relative cursor-grab active:cursor-grabbing select-none"
@@ -759,6 +767,7 @@ IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, conci
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "0 0",
+            pointerEvents: "auto",
           }}
         >
           <AnimatePresence>
@@ -793,7 +802,7 @@ IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, conci
         </div>
 
         {/* Instructions overlay */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none">
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none z-30">
           <div className="bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#20b8cd]" />
             <span>
@@ -805,7 +814,7 @@ IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, conci
         </div>
 
         {isMergeMode && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
             <Button
               className="bg-yellow-500 hover:bg-yellow-600 text-black font-medium shadow-lg"
               onClick={() => {
@@ -819,7 +828,7 @@ IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, conci
         )}
 
         {selectedNodes.length >= 1 && !isMergeMode && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30">
             {showBatchInput ? (
               <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 shadow-2xl border border-white/10 min-w-[400px]">
                 <div className="flex flex-col gap-3">
