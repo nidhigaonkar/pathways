@@ -52,6 +52,7 @@ export default function InfiniteCanvasPage() {
   const [searchQuery, setSearchQuery] = useState("") // Added search state
   const [batchQuery, setBatchQuery] = useState("") // Query for running multiple nodes
   const [showBatchInput, setShowBatchInput] = useState(false) // Show batch input UI
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map())
 
   // Handle canvas panning
   const handleMouseDown = useCallback(
@@ -232,6 +233,36 @@ export default function InfiniteCanvasPage() {
     setSelectedNodes((prev) => (prev.includes(nodeId) ? prev.filter((id) => id !== nodeId) : [...prev, nodeId]))
   }, [])
 
+  // Handler to stop a node's query
+  const handleStopNode = useCallback((nodeId: string) => {
+    const abortController = abortControllersRef.current.get(nodeId)
+    if (abortController) {
+      abortController.abort()
+      abortControllersRef.current.delete(nodeId)
+    }
+    // Remove the last user message that was added before the abort
+    setNodes((prevNodes) =>
+      prevNodes.map((n) => {
+        if (n.id === nodeId) {
+          const currentMessages = n.messages || []
+          if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'user') {
+            const messagesWithoutLast = currentMessages.slice(0, -1)
+            return {
+              ...n,
+              messages: messagesWithoutLast,
+              isLoading: false,
+            }
+          }
+          return {
+            ...n,
+            isLoading: false,
+          }
+        }
+        return n
+      }),
+    )
+  }, [])
+
   // Handler to run a node's query
   const handleRunNode = useCallback(
     async (nodeId: string, userMessage: string) => {
@@ -243,6 +274,10 @@ export default function InfiniteCanvasPage() {
 
       // Add user message to conversation
       const updatedMessages = [...currentMessages, { role: "user" as const, content: userMessage }]
+
+      // Create abort controller for this request
+      const abortController = new AbortController()
+      abortControllersRef.current.set(nodeId, abortController)
 
       setNodes((prevNodes) =>
         prevNodes.map((n) =>
@@ -269,6 +304,7 @@ export default function InfiniteCanvasPage() {
             messages: updatedMessages,
             model: selectedModel,
           }),
+          signal: abortController.signal,
         })
 
         if (!response.ok) {
@@ -281,6 +317,7 @@ export default function InfiniteCanvasPage() {
         // Add AI response to conversation
         const finalMessages = [...updatedMessages, { role: "assistant" as const, content: aiResponse }]
 
+        abortControllersRef.current.delete(nodeId)
         setNodes((prevNodes) =>
           prevNodes.map((n) =>
             n.id === nodeId
@@ -292,8 +329,29 @@ export default function InfiniteCanvasPage() {
               : n,
           ),
         )
-      } catch (error) {
+      } catch (error: any) {
+        // Check if error is due to abort
+        if (error.name === "AbortError") {
+          console.log("Request aborted by user for node:", nodeId)
+          abortControllersRef.current.delete(nodeId)
+          // Remove the user message that was added before the abort
+          const messagesWithoutLast = updatedMessages.slice(0, -1)
+          setNodes((prevNodes) =>
+            prevNodes.map((n) =>
+              n.id === nodeId
+                ? {
+                    ...n,
+                    messages: messagesWithoutLast,
+                    isLoading: false,
+                  }
+                : n,
+            ),
+          )
+          return
+        }
+
         console.error("Error calling Perplexity API:", error)
+        abortControllersRef.current.delete(nodeId)
         // Add error message to conversation
         const errorMessages = [
           ...updatedMessages,
@@ -789,6 +847,7 @@ IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, conci
                   onCreateDirectional={handleCreateDirectional}
                   onStartMerge={handleStartMerge}
                   onRunNode={handleRunNode}
+                  onStopNode={handleStopNode}
                   isMergeMode={isMergeMode}
                   mergeSourceId={mergeSourceId}
                   pan={pan}

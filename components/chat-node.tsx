@@ -7,7 +7,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { X, Mic, Send, Check, Plus, GitMerge } from "lucide-react"
+import { X, Mic, Send, Check, Plus, GitMerge, Square } from "lucide-react"
 import type { ChatNodeType, ChatMessage } from "@/lib/types"
 
 interface ChatNodeProps {
@@ -20,6 +20,7 @@ interface ChatNodeProps {
   onCreateDirectional: (nodeId: string, direction: "top" | "right" | "bottom" | "left") => void
   onStartMerge: (nodeId: string) => void
   onRunNode?: (nodeId: string, userMessage: string) => Promise<void>
+  onStopNode?: (nodeId: string) => void
   isMergeMode: boolean
   mergeSourceId: string | null
   pan: { x: number; y: number }
@@ -38,6 +39,7 @@ export function ChatNode({
   onCreateDirectional,
   onStartMerge,
   onRunNode,
+  onStopNode,
   isMergeMode,
   mergeSourceId,
   pan,
@@ -60,6 +62,7 @@ export function ChatNode({
   const titleInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
   const baseTextRef = useRef<string>("")
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const nodeWidth = node.size?.width || 400
   const nodeHeight = node.size?.height || 500
@@ -253,6 +256,34 @@ export function ChatNode({
     })
   }
 
+  const handleStop = () => {
+    // If onStopNode is provided (batch operations), use it
+    if (onStopNode) {
+      onStopNode(node.id)
+      return
+    }
+    
+    // Otherwise, handle locally
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      
+      // Remove the last user message that was added before the abort
+      const currentMessages = node.messages || []
+      if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'user') {
+        const messagesWithoutLast = currentMessages.slice(0, -1)
+        onUpdate(node.id, {
+          messages: messagesWithoutLast,
+          isLoading: false,
+        })
+      } else {
+        onUpdate(node.id, {
+          isLoading: false,
+        })
+      }
+    }
+  }
+
   const handleSubmit = async () => {
     if (!input.trim()) return
     const userMessage = input.trim()
@@ -270,6 +301,10 @@ export function ChatNode({
     
     // Add user message to conversation
     const updatedMessages = [...currentMessages, { role: 'user' as const, content: userMessage }]
+    
+    // Create abort controller for this request
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
     
     onUpdate(node.id, {
       messages: updatedMessages,
@@ -289,6 +324,7 @@ export function ChatNode({
           messages: updatedMessages,
           model: selectedModel,
         }),
+        signal: abortController.signal,
       })
 
       if (!response.ok) {
@@ -304,13 +340,28 @@ export function ChatNode({
       // Add AI response to conversation
       const finalMessages = [...updatedMessages, { role: 'assistant' as const, content: aiResponse }]
       
+      abortControllerRef.current = null
       onUpdate(node.id, {
         messages: finalMessages,
         isLoading: false,
         isActive: true, // Keep node active after response
       })
-    } catch (error) {
+    } catch (error: any) {
+      // Check if error is due to abort
+      if (error.name === 'AbortError') {
+        console.log('Request aborted by user')
+        abortControllerRef.current = null
+        // Remove the user message that was added before the abort
+        const messagesWithoutLast = currentMessages.slice(0, -1)
+        onUpdate(node.id, {
+          messages: messagesWithoutLast,
+          isLoading: false,
+        })
+        return
+      }
+      
       console.error('Error calling Perplexity API:', error)
+      abortControllerRef.current = null
       // Add error message to conversation
       const errorMessages = [...updatedMessages, { 
         role: 'assistant' as const, 
@@ -687,16 +738,30 @@ export function ChatNode({
               >
                 <Mic className="h-4 w-4" />
               </Button>
-              <Button
-                size="icon"
-                className="h-8 w-8 bg-[#20b8cd] hover:bg-[#1a9db0] text-black"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleSubmit()
-                }}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+              {node.isLoading ? (
+                <Button
+                  size="icon"
+                  className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleStop()
+                  }}
+                  title="Stop generation"
+                >
+                  <Square className="h-4 w-4 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  size="icon"
+                  className="h-8 w-8 bg-[#20b8cd] hover:bg-[#1a9db0] text-black"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleSubmit()
+                  }}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
