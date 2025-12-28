@@ -19,6 +19,7 @@ interface ChatNodeProps {
   onToggleSelect: (nodeId: string) => void
   onCreateDirectional: (nodeId: string, direction: "top" | "right" | "bottom" | "left") => void
   onStartMerge: (nodeId: string) => void
+  onRunNode?: (nodeId: string, userMessage: string) => Promise<void>
   isMergeMode: boolean
   mergeSourceId: string | null
   pan: { x: number; y: number }
@@ -36,6 +37,7 @@ export function ChatNode({
   onToggleSelect,
   onCreateDirectional,
   onStartMerge,
+  onRunNode,
   isMergeMode,
   mergeSourceId,
   pan,
@@ -191,6 +193,14 @@ export function ChatNode({
   const handleSubmit = async () => {
     if (!input.trim()) return
     const userMessage = input.trim()
+    setInput("")
+    
+    // If onRunNode is provided, use it (for batch operations)
+    // Otherwise, handle locally
+    if (onRunNode) {
+      await onRunNode(node.id, userMessage)
+      return
+    }
     
     // Get current messages or initialize empty array
     const currentMessages = node.messages || []
@@ -202,7 +212,6 @@ export function ChatNode({
       messages: updatedMessages,
       isLoading: true,
     })
-    setInput("")
 
     try {
       const selectedModel = node.model || 'sonar'
