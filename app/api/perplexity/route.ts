@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
     }
 
     const perplexityModel = modelMap[model] || 'sonar'
+    
+    // Log the model being used for debugging
+    console.log('Using model:', model, '→ Perplexity model:', perplexityModel)
 
     // Convert messages to Perplexity API format
     const apiMessages = messages.map((msg: { role: string; content: string }) => ({
@@ -29,16 +32,20 @@ export async function POST(request: NextRequest) {
       content: msg.content,
     }))
 
+    const requestBody = {
+      model: perplexityModel,
+      messages: apiMessages,
+    }
+    
+    console.log('API request body:', JSON.stringify(requestBody, null, 2))
+
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: perplexityModel,
-        messages: apiMessages,
-      }),
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {
