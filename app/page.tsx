@@ -741,7 +741,7 @@ IMPORTANT: Your summary must be exactly 75 words or less. Provide a clear, conci
 
     // Get viewport dimensions
     const viewportWidth = canvasRef.current?.clientWidth || window.innerWidth
-    const viewportHeight = (canvasRef.current?.clientHeight || window.innerHeight) - 60 // Account for navbar
+    const viewportHeight = (canvasRef.current?.clientHeight || window.innerHeight) - 72 // Account for navbar
 
     // Calculate zoom to fit
     const zoomX = viewportWidth / contentWidth

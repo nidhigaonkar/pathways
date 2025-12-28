@@ -15,12 +15,15 @@ export function CanvasNavbar({ searchQuery, onSearchChange, onZoomToFit }: Canva
   const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   return (
-    <nav className="h-[60px] bg-[#1a1b1b] border-b border-white/10 flex items-center justify-between px-6 relative z-50">
+    <nav className="h-[72px] bg-[#1a1b1b] border-b border-white/10 flex items-center justify-between px-6 relative z-50">
       {/* Logo */}
       <div className="flex items-center gap-8">
-        <div className="flex items-center gap-2">
-          <span className="text-[#20b8cd] font-bold text-2xl tracking-tight" style={{ fontFamily: "Georgia, serif" }}>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[#20b8cd] font-bold text-3xl tracking-tight" style={{ fontFamily: "Georgia, serif" }}>
             Pathways
+          </span>
+          <span className="text-white text-[10px] font-light leading-tight">
+            powered by Perplexity
           </span>
         </div>
       </div>
